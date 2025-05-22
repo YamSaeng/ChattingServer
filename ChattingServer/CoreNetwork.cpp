@@ -9,6 +9,11 @@ CoreNetwork::CoreNetwork()
 		std::cout << "WSAStartup failed : " << error << std::endl;
 		return;
 	}
+
+	_acceptTPS = 0;
+	_acceptTotal = 0;
+
+	_sessionId = 0;	
 }
 
 CoreNetwork::~CoreNetwork()
@@ -62,8 +67,8 @@ bool CoreNetwork::Start(const WCHAR* openIP, int port)
 	// IOCP 워커 스레드 생성
 	SYSTEM_INFO SI;
 	GetSystemInfo(&SI);
-	
-	for(int i=0;i<(int)SI.dwNumberOfProcessors;i++)
+
+	for (int i = 0; i < (int)SI.dwNumberOfProcessors; i++)
 	{
 		HANDLE hWorkerThread = (HANDLE)_beginthreadex(NULL, 0, WorkerThreadProc, this, 0, NULL);
 		CloseHandle(hWorkerThread);
@@ -72,6 +77,45 @@ bool CoreNetwork::Start(const WCHAR* openIP, int port)
 
 unsigned __stdcall CoreNetwork::AcceptThreadProc(void* argument)
 {
+	CoreNetwork* instance = (CoreNetwork*)argument;
+
+	if (instance != nullptr)
+	{
+		for (;;)
+		{
+			SOCKADDR_IN clientAddr;
+			int addrLen = sizeof(clientAddr);
+
+			// 클라 연결 대기 
+			SOCKET clientSock = accept(instance->_listenSocket, (SOCKADDR*)&clientAddr, &addrLen);
+			if (clientSock == INVALID_SOCKET)
+			{
+				DWORD error = WSAGetLastError();
+				std::cout << "accept failed : " << error << std::endl;
+				break;
+			}
+
+			// 연결 수락 총 개수 증가
+			instance->_acceptTotal++;
+			instance->_acceptTPS++;
+
+			// 세션 할당
+			Session* newSession = new Session();			
+
+			newSession->sessionId = ++instance->_sessionId;
+			newSession->clientAddr = clientAddr;
+			newSession->clientSocket = clientSock;
+
+			// IOCP에 등록
+			CreateIoCompletionPort((HANDLE)newSession->clientSocket, instance->_HCP, (ULONG_PTR)newSession, 0);
+
+			instance->OnClientJoin(newSession);
+
+			// sessions에 저장
+			instance->_sessions.push_back(newSession);
+		}
+	}
+
 	return 0;
 }
 
