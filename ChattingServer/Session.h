@@ -1,5 +1,9 @@
 #pragma once
 #include<WinSock2.h>
+#include<queue>
+
+#include"RingBuffer.h"
+#include"Packet.h"
 
 struct Session
 {
@@ -8,6 +12,9 @@ struct Session
 	
 	SOCKADDR_IN clientAddr; // 서버에 접속한 클라 주소
 
-	OVERLAPPED recvOverlapped = {};
-	OVERLAPPED sendOverlapped = {};	
+	RingBuffer recvRingBuffer; // recvBuf
+	queue<Packet> sendQueue; // sendQueue
+
+	OVERLAPPED recvOverlapped = {}; // WSARecv 통지
+	OVERLAPPED sendOverlapped = {};	// WSASend 통지
 };
