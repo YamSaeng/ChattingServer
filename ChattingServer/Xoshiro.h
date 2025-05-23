@@ -7,6 +7,7 @@ class Xoshiro256
 private:
 	std::array<uint64_t, 4> s;
 
+	// seed 값 초기화
 	uint64_t splitmix64(uint64_t& seed) {
 		uint64_t result = seed;
 		result += 0x9e3779b97f4a7c15;
@@ -21,7 +22,8 @@ private:
 	{
 		return (x << k) | (x >> (64 - k));
 	}
-public:
+
+	// 생성자 
 	Xoshiro256()
 	{
 		uint64_t seed = static_cast<uint64_t>(time(NULL));
@@ -29,7 +31,20 @@ public:
 			val = splitmix64(seed);
 		}
 	}
+		
+	~Xoshiro256() = default;
 
+	// 복사 생성자, 대입 연산자 삭제
+	Xoshiro256(const Xoshiro256&) = delete;
+	Xoshiro256& operator=(const Xoshiro256&) = delete;
+public:	
+	// 싱글턴 객체 반환
+	static Xoshiro256& GetInstance() {
+		static Xoshiro256 instance;
+		return instance;
+	}
+
+	// 랜덤 값 반환
 	uint64_t Next()
 	{
 		const uint64_t result = Rotl(s[0] + s[3], 23) + s[0];
@@ -47,6 +62,7 @@ public:
 		return result;
 	}
 
+	// 범위 사이 랜덤 값 반환
 	uint64_t RandNumber(uint64_t min, uint64_t max)
 	{
 		return min + (Next() % (max - min + 1));
