@@ -2,6 +2,7 @@
 
 #include<stdlib.h>
 #include<time.h>
+#include<utility> 
 
 #define PACKET_BUFFER_DEFAULT_SIZE	100000
 
@@ -42,45 +43,23 @@ public:
 
 	unsigned int GetBufferSize(void);
 	unsigned int GetUseBufferSize(void);
-	unsigned int MoveRearPosition(int size);
-	unsigned int MoveFrontPosition(int size);
+	void MoveRearPosition(int size);
+	void MoveFrontPosition(int size);
 
 	// 바이너리 데이터 넣기
-	Packet& operator = (Packet& packet);
-	Packet& operator << (bool value);
-	Packet& operator << (char value);
-	Packet& operator << (unsigned char value);	
-	Packet& operator << (short value);
-	Packet& operator << (unsigned short value);
-	Packet& operator << (int value);
-	Packet& operator << (unsigned int value);
-	Packet& operator << (long value);
-	Packet& operator << (unsigned long value);
-	Packet& operator << (long long value);
-	Packet& operator << (unsigned long long value);
-	Packet& operator << (float value);
-	Packet& operator << (double value);
+	Packet& operator = (Packet& packet);	
 
-	int InsertData(char* src, int size);
-	int InsertData(const char* src, int size);
+	template<typename T>
+	Packet& operator<<(T& value);
 
-	int InsertData(wchar_t* src, int size);
-	int InsertData(const wchar_t* src, int size);
+	template<typename T>
+	Packet& operator<<(const std::pair<T, int>& value);	
 
-	// 바이너리 데이터 빼기
-	Packet& operator >> (bool& value);
-	Packet& operator >> (char& value);
-	Packet& operator >> (unsigned char& value);
-	Packet& operator >> (short& value);
-	Packet& operator >> (unsigned short& value);
-	Packet& operator >> (int& value);
-	Packet& operator >> (unsigned int& value);
-	Packet& operator >> (long& value);
-	Packet& operator >> (unsigned long& value);
-	Packet& operator >> (long long& value);
-	Packet& operator >> (unsigned long long& value);
-	Packet& operator >> (float& value);
-	Packet& operator >> (double& value);
+	template<typename T>
+	Packet& operator>>(T& value);
+
+	template<typename T>
+	Packet& operator>>(const std::pair<T, int>& value);
 
 	int GetData(char* dest, int size);
 	int GetData(wchar_t* dest, int size);
@@ -93,3 +72,44 @@ public:
 	// 패킷 디코딩
 	bool Decode(void);
 };
+
+template<typename T>
+Packet& Packet::operator<<(T& value)
+{
+	memcpy(&_packetBuffer[_rear], &value, sizeof(T));
+	_rear += sizeof(T);
+	_useBufferSize += sizeof(T);
+
+	return *(this);	
+}
+
+template<typename T>
+Packet& Packet::operator<<(const std::pair<T, int>& value)
+{
+	*this << value.second;	
+	memcpy(&_packetBuffer[_rear], value.first, value.second);
+	_rear += value.second;
+	_useBufferSize += value.second;
+
+	return *(this);
+}
+
+template<typename T>
+Packet& Packet::operator>>(T& value)
+{
+	memcpy(&value, &_packetBuffer[_front], sizeof(T));
+	_front += sizeof(T);
+	_useBufferSize -= sizeof(T);
+
+	return *(this);
+}
+
+template<typename T>
+Packet& Packet::operator>>(const std::pair<T, int>& value)
+{
+	memcpy(value.first, &_packetBuffer[_front], value.second);
+	_front += value.second;
+	_useBufferSize -= value.second;
+
+	return *(this);
+}
