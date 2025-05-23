@@ -1,5 +1,8 @@
 #pragma once
 
+#include<stdlib.h>
+#include<time.h>
+
 #define PACKET_BUFFER_DEFAULT_SIZE	100000
 
 // 패킷 클래스
@@ -63,6 +66,7 @@ public:
 
 	int InsertData(wchar_t* src, int size);
 	int InsertData(const wchar_t* src, int size);
+
 	// 바이너리 데이터 빼기
 	Packet& operator >> (bool& value);
 	Packet& operator >> (char& value);
