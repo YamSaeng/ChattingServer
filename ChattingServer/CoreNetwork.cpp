@@ -1,3 +1,4 @@
+#include"pch.h"
 #include"CoreNetwork.h"
 
 CoreNetwork::CoreNetwork()
@@ -110,6 +111,7 @@ unsigned __stdcall CoreNetwork::AcceptThreadProc(void* argument)
 			CreateIoCompletionPort((HANDLE)newSession->clientSocket, instance->_HCP, (ULONG_PTR)newSession, 0);
 
 			instance->OnClientJoin(newSession);
+			instance->RecvPost(newSession);
 
 			// sessions에 저장
 			instance->_sessions.push_back(newSession);
@@ -122,4 +124,45 @@ unsigned __stdcall CoreNetwork::AcceptThreadProc(void* argument)
 unsigned __stdcall CoreNetwork::WorkerThreadProc(void* argument)
 {
 	return 0;
+}
+
+void CoreNetwork::RecvPost(Session* recvSession)
+{
+	int recvBuffCount = 0;
+	WSABUF recvBuf[2];
+
+	// recvRingBuffer에 한번에 넣을 수 있는 크기를 읽는다.
+	int directEnqueueSize = recvSession->recvRingBuffer.GetDirectEnqueueSize();
+	// 남아 있는 recvRingBuffer의 크기를 읽는다.
+	int recvRingBuffFreeSize = recvSession->recvRingBuffer.GetFreeSize();
+
+	// 만약 남아 있는 recvRingBuffer의 크기가 한번에 넣을 수 있는 크기보다 크다면
+	// recvRingBuffer가 2개의 공간으로 나뉘어 있는 것을 확인할 수 있다.
+	if (recvRingBuffFreeSize > directEnqueueSize)
+	{
+		recvBuffCount = 2;
+		recvBuf[0].buf = recvSession->recvRingBuffer.GetRearBufferPtr();
+		recvBuf[0].len = directEnqueueSize;
+
+		recvBuf[1].buf = recvSession->recvRingBuffer.GetBufferPtr();
+		recvBuf[1].len = recvRingBuffFreeSize - directEnqueueSize;
+	}
+	else
+	{
+		recvBuffCount = 1;
+		recvBuf[0].buf = recvSession->recvRingBuffer.GetRearBufferPtr();
+		recvBuf[0].len = directEnqueueSize;
+	}
+
+	DWORD flags = 0;
+
+	int WSARecvRetval = WSARecv(recvSession->clientSocket, recvBuf, recvBuffCount, NULL, &flags, (LPWSAOVERLAPPED)&recvSession->recvOverlapped, NULL);
+	if (WSARecvRetval == SOCKET_ERROR)
+	{
+		DWORD error = WSAGetLastError();
+		if (error != ERROR_IO_PENDING)
+		{
+
+		}
+	}
 }
