@@ -5,6 +5,10 @@
 
 #include<process.h>
 
+#include<stdlib.h>
+#include<time.h>
+#include<utility>
+
 #include<iostream>
 #include<queue>
 #include<list>
@@ -13,6 +17,10 @@
 #include<cstdint>
 
 #include<cstring>
+
+#include<sysinfoapi.h>
+
+#include"Macro.h"
 
 using namespace std;
 
