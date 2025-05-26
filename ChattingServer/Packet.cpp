@@ -1,5 +1,5 @@
-#include "Packet.h"
-#include<cstring>
+#include"pch.h"
+#include"Packet.h"
 #include"Xoshiro.h"
 
 Packet::Packet()
@@ -42,13 +42,13 @@ unsigned int Packet::GetUseBufferSize(void)
 void Packet::MoveRearPosition(int size)
 {
 	_rear += size;
-	_useBufferSize += size;	
+	_useBufferSize += size;
 }
 
 void Packet::MoveFrontPosition(int size)
 {
 	_front += size;
-	_useBufferSize += size;	
+	_useBufferSize += size;
 }
 
 Packet& Packet::operator=(Packet& packet)
@@ -81,7 +81,7 @@ void Packet::SetHeader(char* header, char size)
 		memcpy(&_packetBuffer[_header], header, size);
 		_useBufferSize += size;
 	}
-	else if(size == 5)
+	else if (size == 5)
 	{
 		memcpy(&_packetBuffer[_header], header, size);
 		_useBufferSize += size;
@@ -91,7 +91,7 @@ void Packet::SetHeader(char* header, char size)
 bool Packet::Encode(void)
 {
 	unsigned char checkSum = 0;
-	unsigned long sum = 0;	
+	unsigned long sum = 0;
 
 	// 헤더 준비
 	EncodeHeader encodeHeader;
@@ -169,7 +169,7 @@ bool Packet::Decode(void)
 	// 복호화 후 체크섬을 구해서 검사
 	unsigned char checkSum = 0;
 	char* payload = &_packetBuffer[_front];
-	
+
 	for (int i = 0; i < decodeHeader->packetLen; i++)
 	{
 		sum += *payload;

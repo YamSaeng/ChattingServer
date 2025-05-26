@@ -1,8 +1,4 @@
 #pragma once
-#include <string.h>
-#include <iostream>
-
-#include"Macro.h"
 
 #define BUFFER_DEFAULT_SIZE	100001
 #define BLANK				1

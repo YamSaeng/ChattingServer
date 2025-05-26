@@ -1,6 +1,4 @@
 #pragma once
-#include<WinSock2.h>
-#include<queue>
 
 #include"RingBuffer.h"
 #include"Packet.h"

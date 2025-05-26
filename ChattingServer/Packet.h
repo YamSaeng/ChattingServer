@@ -1,9 +1,5 @@
 #pragma once
 
-#include<stdlib.h>
-#include<time.h>
-#include<utility> 
-
 #define PACKET_BUFFER_DEFAULT_SIZE	100000
 
 // 패킷 클래스
