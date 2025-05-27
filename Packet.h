@@ -1,9 +1,15 @@
 #pragma once
 
+#ifdef PACKET
+#define PACKET_DLL __declspec(dllexport)
+#else
+#define PACKET_DLL __declspec(dllimport)
+#endif
+
 #define PACKET_BUFFER_DEFAULT_SIZE	100000
 
 // 패킷 클래스
-class Packet
+class PACKET_DLL Packet
 {
 public:
 #pragma pack(push,1)
@@ -43,13 +49,13 @@ public:
 	void MoveFrontPosition(int size);
 
 	// 바이너리 데이터 넣기
-	Packet& operator = (Packet& packet);	
+	Packet& operator = (Packet& packet);
 
 	template<typename T>
 	Packet& operator<<(T& value);
 
 	template<typename T>
-	Packet& operator<<(const std::pair<T, int>& value);	
+	Packet& operator<<(const std::pair<T, int>& value);
 
 	template<typename T>
 	Packet& operator>>(T& value);
@@ -76,13 +82,13 @@ Packet& Packet::operator<<(T& value)
 	_rear += sizeof(T);
 	_useBufferSize += sizeof(T);
 
-	return *(this);	
+	return *(this);
 }
 
 template<typename T>
 Packet& Packet::operator<<(const std::pair<T, int>& value)
 {
-	*this << value.second;	
+	*this << value.second;
 	memcpy(&_packetBuffer[_rear], value.first, value.second);
 	_rear += value.second;
 	_useBufferSize += value.second;

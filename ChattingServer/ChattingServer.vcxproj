@@ -138,7 +138,6 @@
     <ClCompile Include="ChattingServer.CPP" />
     <ClCompile Include="CoreNetwork.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="Packet.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
@@ -147,10 +146,8 @@
     <ClInclude Include="ChattingServer.h" />
     <ClInclude Include="CoreNetwork.h" />
     <ClInclude Include="Macro.h" />
-    <ClInclude Include="Packet.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Session.h" />
-    <ClInclude Include="Xoshiro.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
