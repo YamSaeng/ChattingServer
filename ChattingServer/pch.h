@@ -20,6 +20,9 @@
 
 #include<sysinfoapi.h>
 
+#include <io.h>
+#include <fcntl.h>
+
 #include"Macro.h"
 
 using namespace std;
