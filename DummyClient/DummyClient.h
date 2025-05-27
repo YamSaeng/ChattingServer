@@ -22,4 +22,5 @@ public:
 	list<DummyClientSession*> _dummyClientList;
 
 	bool DummyClientCountSet(int dummyClientCount);
+	void DummyClientStart(void);
 };
