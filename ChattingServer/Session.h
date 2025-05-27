@@ -1,7 +1,9 @@
 #pragma once
 
-#include"RingBuffer.h"
 #include"Packet.h"
+#include"../RingBuffer.h"
+
+#pragma comment(lib, "..\\x64\\Debug\\RingBuffer.lib")
 
 struct Session
 {
