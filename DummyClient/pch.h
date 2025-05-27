@@ -1,7 +1,24 @@
 #pragma once
 
-#include<iostream>
-#include<winsock2.h>
+#include<WinSock2.h>
 #include<WS2tcpip.h>
 
 #include<process.h>
+
+#include<stdlib.h>
+#include<time.h>
+#include<utility>
+
+#include<iostream>
+#include<queue>
+#include<list>
+#include<array>
+
+#include<cstdint>
+
+#include<cstring>
+
+#include<sysinfoapi.h>
+
+using namespace std;
+
