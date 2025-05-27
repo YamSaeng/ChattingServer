@@ -20,5 +20,8 @@
 
 #include<sysinfoapi.h>
 
+#include <io.h>
+#include <fcntl.h>
+
 using namespace std;
 

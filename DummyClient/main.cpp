@@ -1,4 +1,7 @@
 #include"pch.h"
+#include"DummyClient.h"
+
+DummyClient gDummyClient;
 
 int main()
 {
@@ -15,14 +18,21 @@ int main()
 		wcout << L"선택 : ";
 		cin >> dummyClientMenuSelectNum;
 
-		if (dummyClientMenuSelectNum == 2)
+		switch (dummyClientMenuSelectNum)
 		{
+		case 1:
+			gDummyClient.DummyClientCountSet(dummyClientMenuSelectNum);
+			break;
+		case 2:
 			if (isDummyCountSet == false)
 			{
 				wcout << L"채팅 더미 개수를 설정하고 접속하세요" << endl;
 				wcout << L"====================================" << endl << endl;
 			}
-		}
+			break;
+		default:
+			break;
+		}		
 
 		Sleep(1000);
 	}
