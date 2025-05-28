@@ -13,7 +13,10 @@ DummyClient::DummyClient()
 
 	_dummyClientSessionId = 0;
 
+	// 비신호, 자동 리셋 상태로 이벤트 생성
 	_connetThreadWakeEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+
+	_duumyClientCount = 0;
 
 	_dummyClientHCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
 	if (_dummyClientHCP == NULL)
@@ -41,9 +44,9 @@ DummyClient::~DummyClient()
 
 unsigned __stdcall DummyClient::ConnectThreadProc(void* argument)
 {
-	DummyClient* Instance = (DummyClient*)argument;
+	DummyClient* instance = (DummyClient*)argument;
 
-	if (Instance != nullptr)
+	if (instance != nullptr)
 	{
 		SOCKADDR_IN serverAddr;
 		memset(&serverAddr, 0, sizeof(serverAddr));
@@ -51,9 +54,9 @@ unsigned __stdcall DummyClient::ConnectThreadProc(void* argument)
 		InetPton(AF_INET, L"127.0.0.1", &serverAddr.sin_addr);
 		serverAddr.sin_port = htons(8888);
 
-		WaitForSingleObject(Instance->_connetThreadWakeEvent, INFINITE);
+		WaitForSingleObject(instance->_connetThreadWakeEvent, INFINITE);
 
-		while (1)
+		for (int i = 0; i < instance->_duumyClientCount; i++)
 		{
 			DummyClientSession* dummyClientSession = new DummyClientSession();
 			dummyClientSession->clientSocket = socket(AF_INET, SOCK_STREAM, 0);
@@ -66,10 +69,11 @@ unsigned __stdcall DummyClient::ConnectThreadProc(void* argument)
 				break;
 			}
 
-			dummyClientSession->dummyClientSessionId = ++Instance->_dummyClientSessionId;
+			dummyClientSession->dummyClientSessionId = ++instance->_dummyClientSessionId;
 			dummyClientSession->serverAddr = serverAddr;
-		}
 
+			instance->_dummyClientList.push_back(dummyClientSession);
+		}
 	}
 
 	return 0;
@@ -80,27 +84,16 @@ unsigned __stdcall DummyClient::WorkerThreadProc(void* argument)
 	return 0;
 }
 
-bool DummyClient::DummyClientCountSet(int dummyClientCount)
+void DummyClient::DummyClientStart(int dummyClientCount)
 {
 	if (dummyClientCount <= 0)
 	{
 		wcout << L"1개 이상의 더미를 생성하세요" << endl;
-		return false;
+		return;
 	}
 
-	for (int i = 0; i < dummyClientCount; i++)
-	{
-		DummyClientSession* dummyClientSession = new DummyClientSession();
-		_dummyClientList.push_back(dummyClientSession);
-	}
+	_duumyClientCount = dummyClientCount;	
 
-	wcout << L"더미 [" << dummyClientCount << L"] 개 생성 완료" << endl << endl;
-
-	return true;
-}
-
-void DummyClient::DummyClientStart(void)
-{
 	wcout << L"더미 클라이언트 시작 더미 개수 [" << _dummyClientList.size() << L"] 개" << endl;
 
 	SetEvent(_connetThreadWakeEvent);

@@ -6,7 +6,9 @@ DummyClient gDummyClient;
 int main()
 {
 	bool isDummyCountSet = false;
+	bool isDummyStartSet = false;
 	short dummyClientMenuSelectNum = 0;
+	int dummyClientCount = 0;
 
 	_setmode(_fileno(stdout), _O_U16TEXT);
 
@@ -21,19 +23,36 @@ int main()
 		switch (dummyClientMenuSelectNum)
 		{
 		case 1:
-			gDummyClient.DummyClientCountSet(dummyClientMenuSelectNum);
+			wcout << L"생성할 더미 개수 입력 : ";
+			cin >> dummyClientCount;			
+			isDummyCountSet = true;
+
+			wcout << endl;
 			break;
 		case 2:
 			if (isDummyCountSet == false)
 			{
 				wcout << L"채팅 더미 개수를 설정하고 접속하세요" << endl;
 				wcout << L"====================================" << endl << endl;
+				break;
 			}
+
+			gDummyClient.DummyClientStart(dummyClientCount);
+
+			isDummyStartSet = true;
 			break;
 		default:
 			break;
-		}		
+		}
 
+		if (isDummyCountSet == true && isDummyStartSet == true)
+		{
+			break;
+		}		
+	}
+
+	while (1)
+	{
 		Sleep(1000);
 	}
 

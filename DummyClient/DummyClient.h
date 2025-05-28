@@ -19,8 +19,8 @@ private:
 
 	static unsigned __stdcall WorkerThreadProc(void* argument);
 public:
+	int _duumyClientCount;
 	list<DummyClientSession*> _dummyClientList;
-
-	bool DummyClientCountSet(int dummyClientCount);
-	void DummyClientStart(void);
+	
+	void DummyClientStart(int dummyClientCount);
 };
