@@ -107,6 +107,8 @@ unsigned __stdcall CoreNetwork::AcceptThreadProc(void* argument)
 			newSession->clientAddr = clientAddr;
 			newSession->clientSocket = clientSock;
 
+			newSession->IOBlock = new IOBlock();			
+
 			// IOCP에 등록
 			CreateIoCompletionPort((HANDLE)newSession->clientSocket, instance->_HCP, (ULONG_PTR)newSession, 0);
 
@@ -165,4 +167,23 @@ void CoreNetwork::RecvPost(Session* recvSession)
 
 		}
 	}
+}
+
+Session* CoreNetwork::FindSession(__int64 sessionId)
+{
+	int sessionIndex = GET_SESSION_INDEX(sessionId);
+
+	Session* findSession = _sessions[sessionIndex];
+	if (findSession == nullptr)
+	{
+		return nullptr;
+	}
+
+	// 만약 session이 release 작업 예정이라면 나간다.
+	if (findSession->IOBlock->IsRelease == 1)
+	{
+		return nullptr;
+	}	
+
+	return nullptr;
 }
