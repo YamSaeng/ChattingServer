@@ -3,7 +3,12 @@
 
 #include"Session.h"
 
-using namespace std;
+// 상위 16비트에 SessionId를 기록하고 하위 16비트에 Session이 위치해 있는 Index를 기록한다.
+#define MAKE_SESSION_ID(SESSION_ID, INDEX) (((uint32_t)(SESSION_ID) << 16) | ((uint32_t)(INDEX) & 0xFFFF))
+// 상위 16비트에서 SessionId를 가져옴
+#define GET_SESSION_ID(SESSION_UID)        ((uint16_t)((SESSION_UID >> 16) & 0xFFFF))
+// 하위 16비트에서 SessionIndex를 가져옴
+#define GET_SESSION_INDEX(SESSION_UID)     ((uint16_t)(SESSION_UID & 0xFFFF))
 
 class CoreNetwork
 {
@@ -20,8 +25,8 @@ private:
 	// 서버에 접속한 sessionId;
 	INT64 _sessionId;
 
-	// 서버에서 관리할 session 리스트
-	list<Session*> _sessions;	
+	// 서버에서 관리할 session 배열
+	vector<Session*> _sessions;	
 
 	// Accept 전용 스레드 함수
 	static unsigned __stdcall AcceptThreadProc(void* argument);
@@ -30,12 +35,12 @@ private:
 	static unsigned __stdcall WorkerThreadProc(void* argument);	
 
 	// WSARecv 등록
-	void RecvPost(Session* recvSession);
+	void RecvPost(Session* recvSession);	
 
 protected:
 	// accept 호출 후 접속한 클라를 대상으로 호출하는 함수
 	virtual void OnClientJoin(Session* newSession) = 0;
-
+	
 public:
 	// 1초 동안 연결 수락 개수
 	int _acceptTPS;
@@ -43,5 +48,5 @@ public:
 	int _acceptTotal;
 
 	// 서버 시작
-	bool Start(const WCHAR* openIP, int port);
+	bool Start(const WCHAR* openIP, int port);	
 };
