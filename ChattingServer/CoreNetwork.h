@@ -35,8 +35,10 @@ private:
 	static unsigned __stdcall WorkerThreadProc(void* argument);
 
 	// WSARecv 등록
-	void RecvPost(Session* recvSession);
+	void RecvPost(Session* recvSession, bool isAcceptRecvPost = false);	
 
+	// IOCount가 0인 대상을 해제한다.
+	void ReleaseSession(Session* releaseSession);
 protected:
 	// accept 호출 후 접속한 클라를 대상으로 호출하는 함수
 	virtual void OnClientJoin(Session* newSession) = 0;

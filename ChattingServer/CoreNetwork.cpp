@@ -112,6 +112,9 @@ unsigned __stdcall CoreNetwork::AcceptThreadProc(void* argument)
 			// IOCP에 등록
 			CreateIoCompletionPort((HANDLE)newSession->clientSocket, instance->_HCP, (ULONG_PTR)newSession, 0);
 
+			newSession->IOBlock->IOCount++;
+			newSession->IOBlock->IsRelease = 0;
+
 			instance->OnClientJoin(newSession);
 			instance->RecvPost(newSession);
 
@@ -128,7 +131,7 @@ unsigned __stdcall CoreNetwork::WorkerThreadProc(void* argument)
 	return 0;
 }
 
-void CoreNetwork::RecvPost(Session* recvSession)
+void CoreNetwork::RecvPost(Session* recvSession, bool isAcceptRecvPost)
 {
 	int recvBuffCount = 0;
 	WSABUF recvBuf[2];
@@ -156,6 +159,14 @@ void CoreNetwork::RecvPost(Session* recvSession)
 		recvBuf[0].len = directEnqueueSize;
 	}
 
+	// WSARecv를 걸기 전에 한번 청소해준다.
+	memset(&recvSession->recvOverlapped, 0, sizeof(OVERLAPPED));
+		
+	if (isAcceptRecvPost == false)
+	{
+		InterlockedIncrement64(&recvSession->IOBlock->IOCount);
+	}	
+
 	DWORD flags = 0;
 
 	int WSARecvRetval = WSARecv(recvSession->clientSocket, recvBuf, recvBuffCount, NULL, &flags, (LPWSAOVERLAPPED)&recvSession->recvOverlapped, NULL);
@@ -166,6 +177,34 @@ void CoreNetwork::RecvPost(Session* recvSession)
 		{
 
 		}
+	}
+}
+
+void CoreNetwork::ReleaseSession(Session* releaseSession)
+{
+	IOBlock compareBlock;
+	compareBlock.IOCount = 0;
+	compareBlock.IsRelease = 0;
+
+	// release Session에 대해서 더블 CAS를 통해
+	// IOCount가 0 인지( 사용중인지 아닌지 확인 )와
+	// IsRelease가 true 인지( Release를 한 세션 인지 확인 )를 확인한다.
+	if (!InterlockedCompareExchange128((LONG64*)releaseSession->IOBlock, (LONG64)true, (LONG64)0, (LONG64*)&compareBlock))
+	{
+		return;
+	}
+
+	releaseSession->recvRingBuffer.ClearBuffer();
+
+	while (releaseSession->sendQueue.size() > 0)
+	{
+		Packet* deletePacket = releaseSession->sendQueue.front();
+		if (deletePacket == nullptr)
+		{
+			continue;
+		}
+
+		delete deletePacket;
 	}
 }
 
