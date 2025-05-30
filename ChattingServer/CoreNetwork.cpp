@@ -175,7 +175,10 @@ void CoreNetwork::RecvPost(Session* recvSession, bool isAcceptRecvPost)
 		DWORD error = WSAGetLastError();
 		if (error != ERROR_IO_PENDING)
 		{
-
+			if (InterlockedDecrement64(&recvSession->IOBlock->IOCount) == 0)
+			{
+				ReleaseSession(recvSession);
+			}
 		}
 	}
 }
@@ -224,5 +227,28 @@ Session* CoreNetwork::FindSession(__int64 sessionId)
 		return nullptr;
 	}	
 
+	// IOCount를 1 증가시켰을 때 그 값이 1인지 확인한다.
+	// 1 이라면 해당 session이 release 중이거나 예정임을 알 수 있다.
+	if (InterlockedIncrement64(&findSession->IOBlock->IOCount) == 1)
+	{
+		// 여기서 IOCount를 1 감소시켰을 때 0이라면 release를 진행한다.
+		// 다른 곳에서 IOCount가 감소하고, 아직 ReleaseSession을 호출하기 전일 수 있으니까.
+		if (InterlockedDecrement64(&findSession->IOBlock->IOCount) == 0)
+		{
+			ReleaseSession(findSession);
+		}
+
+		// 아니라면 nullptr을 반환해 release 대상임을 알려준다.
+		return nullptr;
+	}
+
 	return nullptr;
+}
+
+void CoreNetwork::ReturnSession(Session* session)
+{
+	if (InterlockedDecrement64(&session->IOBlock->IOCount) == 0)
+	{
+		ReleaseSession(session);
+	}
 }
