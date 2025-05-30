@@ -45,6 +45,12 @@ public:
 
 	unsigned int GetBufferSize(void);
 	unsigned int GetUseBufferSize(void);
+
+	char* GetBufferPtr(void);
+	char* GetHeaderBufferPtr(void);
+	char* GetFrontBufferPtr(void);
+	char* GetRearBufferPtr(void);
+
 	void MoveRearPosition(int size);
 	void MoveFrontPosition(int size);
 
