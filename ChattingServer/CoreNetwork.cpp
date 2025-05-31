@@ -76,6 +76,26 @@ bool CoreNetwork::Start(const WCHAR* openIP, int port)
 	}
 }
 
+void CoreNetwork::SendPacket(__int64 sessionId, Packet* packet)
+{	
+	Session* sendSession = FindSession(sessionId);
+	if (sendSession == nullptr)
+	{
+		return;
+	}
+
+	packet->Encode();
+
+	// 패킷 큐잉
+	sendSession->sendQueue.push(packet);
+
+	// WSASend 등록
+	SendPost(sendSession);
+
+	// FindSession에서 증가시켜준 IOCount를 줄여줌
+	ReturnSession(sendSession);
+}
+
 unsigned __stdcall CoreNetwork::AcceptThreadProc(void* argument)
 {
 	CoreNetwork* instance = (CoreNetwork*)argument;
@@ -183,6 +203,11 @@ void CoreNetwork::RecvPost(Session* recvSession, bool isAcceptRecvPost)
 	}
 }
 
+void CoreNetwork::SendPost(Session* sendSession)
+{
+
+}
+
 void CoreNetwork::ReleaseSession(Session* releaseSession)
 {
 	IOBlock compareBlock;
@@ -197,11 +222,15 @@ void CoreNetwork::ReleaseSession(Session* releaseSession)
 		return;
 	}
 
+	// recvBuf 청소
 	releaseSession->recvRingBuffer.ClearBuffer();
 
+	// sendPacket을 호출해서 패킷을 enqueue만 하고 빠질 가능성이 있기 때문에
+	// 이 부분에서 sendQueue의 크기를 확인해서 내용이 남아있으면 해제한다.
 	while (releaseSession->sendQueue.size() > 0)
 	{
 		Packet* deletePacket = releaseSession->sendQueue.front();
+		releaseSession->sendQueue.pop();
 		if (deletePacket == nullptr)
 		{
 			continue;
@@ -242,7 +271,7 @@ Session* CoreNetwork::FindSession(__int64 sessionId)
 		return nullptr;
 	}
 
-	return nullptr;
+	return findSession;
 }
 
 void CoreNetwork::ReturnSession(Session* session)

@@ -37,6 +37,9 @@ private:
 	// WSARecv 등록
 	void RecvPost(Session* recvSession, bool isAcceptRecvPost = false);	
 
+	// WSASend 등록
+	void SendPost(Session* sendSession);
+
 	// IOCount가 0인 대상을 해제한다.
 	void ReleaseSession(Session* releaseSession);
 protected:
@@ -46,6 +49,8 @@ protected:
 	// 세션 찾기
 	Session* FindSession(__int64 sessionId);
 
+	// 증가시킨 IOCount를 1 감소시킨다.
+	void ReturnSession(Session* session);
 public:
 	// 1초 동안 연결 수락 개수
 	int _acceptTPS;
@@ -54,4 +59,7 @@ public:
 
 	// 서버 시작
 	bool Start(const WCHAR* openIP, int port);
+
+	// 패킷을 전송
+	void SendPacket(__int64 sessionId, Packet* packet);
 };
