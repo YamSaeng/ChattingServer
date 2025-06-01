@@ -344,6 +344,23 @@ void CoreNetwork::RecvComplete(Session* recvCompleteSesion, const DWORD& transfe
 
 void CoreNetwork::SendComplete(Session* sendCompleteSession)
 {
+	// 전송 완료된 패킷을 정리한다.
+	for (int i = 0; i < sendCompleteSession->sendPacketCount; i++)
+	{
+		delete sendCompleteSession->sendPacket[i];
+	}
+
+	sendCompleteSession->sendPacketCount = 0;
+
+	// isSend를 0 으로 바꿔서 WSASend를 걸수 있도록 해준다.
+	InterlockedExchange(&sendCompleteSession->isSend, 0);
+
+	// 만약 위에서 바꾸기 전에 큐잉만 하고 빠질 경우
+	// 여기서 크기를 검사해서 WSASend를 걸어준다.
+	if (sendCompleteSession->sendQueue.size() > 0)
+	{
+		SendPost(sendCompleteSession);
+	}
 }
 
 Session* CoreNetwork::FindSession(__int64 sessionId)
