@@ -42,9 +42,18 @@ private:
 
 	// IOCount가 0인 대상을 해제한다.
 	void ReleaseSession(Session* releaseSession);
+
+	// WSARecv 완료시 호출하는 함수
+	void RecvComplete(Session* recvCompleteSesion, const DWORD& transferred);
+
+	// WSASend 완료시 호출하는 함수
+	void SendComplete(Session* sendCompleteSession);
 protected:
 	// accept 호출 후 접속한 클라를 대상으로 호출하는 함수
 	virtual void OnClientJoin(Session* newSession) = 0;
+
+	// packet 처리
+	virtual void OnRecv(__int64 sessionId, Packet* packet) = 0;
 
 	// 세션 찾기
 	Session* FindSession(__int64 sessionId);

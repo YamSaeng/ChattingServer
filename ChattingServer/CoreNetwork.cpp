@@ -287,6 +287,59 @@ void CoreNetwork::ReleaseSession(Session* releaseSession)
 
 void CoreNetwork::RecvComplete(Session* recvCompleteSesion, const DWORD& transferred)
 {
+	int loopCount = 0;
+	const int MAX_PACKET_LOOP = 64;
+	recvCompleteSesion->recvRingBuffer.MoveRear(transferred);
+
+	Packet::EncodeHeader encodeHeader;
+	Packet* packet = new Packet();
+
+	while (loopCount++ < MAX_PACKET_LOOP)
+	{
+		packet->Clear();
+
+		// 최소한 헤더 크기만큼은 데이터가 왔는지 확인한다.
+		if (recvCompleteSesion->recvRingBuffer.GetUseSize() < sizeof(Packet::EncodeHeader))
+		{
+			break;
+		}
+
+		// 헤더를 뽑아본다.
+		recvCompleteSesion->recvRingBuffer.Peek((char*)&encodeHeader, sizeof(Packet::EncodeHeader));
+		if (encodeHeader.packetLen + sizeof(Packet::EncodeHeader) > recvCompleteSesion->recvRingBuffer.GetUseSize())
+		{
+			// 1차 패킷 코드인 52값이 아니라면 나감
+			if (encodeHeader.packetCode != 52)
+			{
+				break;
+			}			
+		}
+
+		// 비정상적으로 너무 큰 패킷이 올경우
+		if (encodeHeader.packetLen > PACKET_BUFFER_DEFAULT_SIZE)
+		{
+			break;
+		}
+
+		// 헤더 크기만큼 front를 움직이기
+		recvCompleteSesion->recvRingBuffer.MoveFront(sizeof(Packet::EncodeHeader));
+		// 패킷 길이만큼 뽑아서 packet에 넣기
+		recvCompleteSesion->recvRingBuffer.Dequeue(packet->GetRearBufferPtr(), encodeHeader.packetLen);
+		// 헤더 설정
+		packet->SetHeader((char*)&encodeHeader, sizeof(Packet::EncodeHeader));
+		// 패킷 길이 만큼 rear 움직이기
+		packet->MoveRearPosition(encodeHeader.packetLen);
+
+		if (packet->Decode() == false)
+		{
+			break;
+		}	
+
+		// 패킷 처리
+		OnRecv(recvCompleteSesion->sessionId, packet);
+	}
+	
+	delete packet;
 }
 
 void CoreNetwork::SendComplete(Session* sendCompleteSession)
