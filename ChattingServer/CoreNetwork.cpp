@@ -148,6 +148,51 @@ unsigned __stdcall CoreNetwork::AcceptThreadProc(void* argument)
 
 unsigned __stdcall CoreNetwork::WorkerThreadProc(void* argument)
 {
+	CoreNetwork* instance = (CoreNetwork*)argument;
+
+	if (instance != nullptr)
+	{
+		Session* completeSession = nullptr;
+		while (1)
+		{
+			DWORD transferred = 0;
+			OVERLAPPED* myOverlapped = nullptr;
+			int completeRet;
+			DWORD GQCSError;
+
+			do
+			{
+				completeRet = GetQueuedCompletionStatus(instance->_HCP, &transferred,
+					(PULONG_PTR)&completeSession, (LPOVERLAPPED*)&myOverlapped, INFINITE);
+				if (myOverlapped == nullptr)
+				{
+					GQCSError = WSAGetLastError();
+					wcout << L"MyOverlapped NULL " << GQCSError << endl;
+					return -1;
+				}
+
+				if (transferred == 0)
+				{
+					break;
+				}
+
+				if (myOverlapped == &completeSession->recvOverlapped)
+				{
+					instance->RecvComplete(completeSession, transferred);
+				}
+				else if (myOverlapped == &completeSession->sendOverlapped)
+				{
+					instance->SendComplete(completeSession);
+				}
+			} while (0);
+
+			if (InterlockedDecrement64(&completeSession->IOBlock->IOCount) == 0)
+			{
+				instance->ReleaseSession(completeSession);
+			}
+		}
+	}
+
 	return 0;
 }
 
@@ -238,6 +283,14 @@ void CoreNetwork::ReleaseSession(Session* releaseSession)
 
 		delete deletePacket;
 	}
+}
+
+void CoreNetwork::RecvComplete(Session* recvCompleteSesion, const DWORD& transferred)
+{
+}
+
+void CoreNetwork::SendComplete(Session* sendCompleteSession)
+{
 }
 
 Session* CoreNetwork::FindSession(__int64 sessionId)
