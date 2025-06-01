@@ -71,4 +71,7 @@ public:
 
 	// 패킷을 전송
 	void SendPacket(__int64 sessionId, Packet* packet);
+
+	// 끊기
+	void Disconnect(__int64 sessionId);
 };

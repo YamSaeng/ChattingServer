@@ -96,6 +96,27 @@ void CoreNetwork::SendPacket(__int64 sessionId, Packet* packet)
 	ReturnSession(sendSession);
 }
 
+void CoreNetwork::Disconnect(__int64 sessionId)
+{
+	// 연결 종료할 session을 찾음
+	Session* disconnectSession = FindSession(sessionId);	
+	if (disconnectSession == nullptr)
+	{		
+		return;
+	}
+
+	if (disconnectSession->IOBlock->IOCount == 0)
+	{
+		ReleaseSession(disconnectSession);
+	}
+	else
+	{
+		CancelIoEx((HANDLE)disconnectSession->clientSocket, NULL);
+	}
+
+	ReturnSession(disconnectSession);
+}
+
 unsigned __stdcall CoreNetwork::AcceptThreadProc(void* argument)
 {
 	CoreNetwork* instance = (CoreNetwork*)argument;
