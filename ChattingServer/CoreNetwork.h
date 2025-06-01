@@ -14,7 +14,7 @@ class CoreNetwork
 {
 public:
 	CoreNetwork();
-	~CoreNetwork();
+	virtual ~CoreNetwork();
 private:
 	// IOCP 핸들 
 	HANDLE _HCP;
@@ -60,6 +60,9 @@ protected:
 
 	// 증가시킨 IOCount를 1 감소시킨다.
 	void ReturnSession(Session* session);
+
+	// ReleaseSession 안에서 반납되는 session을 기준으로 호출
+	virtual void OnClientLeave(Session* leaveSession) = 0;
 public:
 	// 1초 동안 연결 수락 개수
 	int _acceptTPS;

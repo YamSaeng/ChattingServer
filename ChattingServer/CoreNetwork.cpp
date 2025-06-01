@@ -271,7 +271,97 @@ void CoreNetwork::RecvPost(Session* recvSession, bool isAcceptRecvPost)
 
 void CoreNetwork::SendPost(Session* sendSession)
 {
+	int sendUseSize;
+	int sendCount = 0;
+	WSABUF sendBuf[500];
 
+	do
+	{
+		// Session의 isSend를 1로 바꾸면서 진입한다.
+		// 다른 워커 쓰레드가 WSASend를 하지 않도록 막는다.
+		if (InterlockedExchange(&sendSession->isSend, 1) == 0)
+		{
+			sendUseSize = sendSession->sendQueue.size();
+
+			/*
+				보내려고 진입했지만 isSend가 1이라 다른 스레드에서 이미 WSASend 중일 수 있다.
+				만약 sendQueue가 비어 있다고 판단하고 isSend를 0으로 바꾸는 순간
+				다른 스레드가 패킷을 넣고 SendPost를 호출할 수 있다.
+				하지만 isSend가 여전히 1이므로 그 스레드는 WSASend를 시도하지 못하고 빠져나간다.
+				결국 현재 스레드도 그냥 빠져나가면 새로 들어온 패킷은 전송되지 않은 채로 남게 된다.
+				따라서 isSend를 0으로 바꾼 직후, 큐에 데이터가 들어왔는지를 한번 더 확인하고,
+				존재한다면 다시 SendPost를 반복하여 WSASend를 시도한다.
+
+				ex) 일반적인 상황
+				A Thread 진입 isSend = 1로 설정하고 진입
+				sendQueue.size() == 0 확인 이후 나감				
+
+				A, B Thread 2개
+				A Thread 진입 isSend = 1로 설정하고 진입
+				sendQueue.size() == 0 확인 isSend = 0 으로 바꾸기 직전
+				B Thread가 패킷을 큐잉하고 진입 isSend가 1이라 그냥 나감
+
+				B Thread에서 패킷을 넣었는데 isSend가 1이라 그냥 나가고
+				A Thread에서는 sendQueue.size()가 0이 였기 때문에 isSend를 0으로 바꾸고 그냥 나감
+				
+				결국 큐에 패킷이 남아 있는데 WSASend를 하지 않기 때문에 
+
+				A Thread에서 sendQue를 다시한번 확인해서 SendPost를 다시 진행시킨다.
+			*/
+			if (sendUseSize == 0)
+			{
+				InterlockedExchange(&sendSession->isSend, 0);
+
+				if (!sendSession->sendQueue.empty())
+				{
+					continue;
+				}
+				else
+				{
+					return;
+				}
+			}			
+		}
+		else
+		{
+			return;
+		}
+	} while (0);
+
+	sendSession->sendPacketCount = sendCount = sendUseSize;
+
+	for (int i = 0; i < sendCount; i++)
+	{
+		if (sendSession->sendQueue.size() == 0)
+		{
+			break;
+		}
+
+		Packet* packet = sendSession->sendQueue.front();
+		sendSession->sendQueue.pop();
+		
+		sendBuf[i].buf = packet->GetHeaderBufferPtr();
+		sendBuf[i].len = packet->GetUseBufferSize();
+
+		sendSession->sendPacket[i] = packet;
+	}
+
+	memset(&sendSession->sendOverlapped, 0, sizeof(OVERLAPPED));
+
+	InterlockedIncrement64(&sendSession->IOBlock->IOCount);
+
+	int WSASendRetval = WSASend(sendSession->clientSocket, sendBuf, sendCount, NULL, 0, (LPWSAOVERLAPPED)&sendSession->sendOverlapped, NULL);
+	if (WSASendRetval == SOCKET_ERROR)
+	{
+		DWORD error = WSAGetLastError();
+		if (error != ERROR_IO_PENDING)
+		{
+			if (InterlockedDecrement64(&sendSession->IOBlock->IOCount) == 0)
+			{
+				ReleaseSession(sendSession);
+			}
+		}
+	}
 }
 
 void CoreNetwork::ReleaseSession(Session* releaseSession)
