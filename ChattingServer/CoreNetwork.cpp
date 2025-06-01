@@ -332,13 +332,15 @@ void CoreNetwork::RecvComplete(Session* recvCompleteSesion, const DWORD& transfe
 			// 1차 패킷 코드인 52값이 아니라면 나감
 			if (encodeHeader.packetCode != 52)
 			{
+				Disconnect(recvCompleteSesion->sessionId);
 				break;
 			}			
 		}
 
-		// 비정상적으로 너무 큰 패킷이 올경우
+		// 비정상적으로 너무 큰 패킷이 올경우 연결을 끊음
 		if (encodeHeader.packetLen > PACKET_BUFFER_DEFAULT_SIZE)
 		{
+			Disconnect(recvCompleteSesion->sessionId);
 			break;
 		}
 
@@ -351,8 +353,10 @@ void CoreNetwork::RecvComplete(Session* recvCompleteSesion, const DWORD& transfe
 		// 패킷 길이 만큼 rear 움직이기
 		packet->MoveRearPosition(encodeHeader.packetLen);
 
-		if (packet->Decode() == false)
+		// 디코딩에 실패하면 연결을 끊음
+		if (!packet->Decode())
 		{
+			Disconnect(recvCompleteSesion->sessionId);
 			break;
 		}	
 
