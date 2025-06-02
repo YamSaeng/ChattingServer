@@ -28,6 +28,12 @@ private:
 	// 서버에서 관리할 session 배열
 	vector<Session*> _sessions;
 
+	// Accept 스레드 핸들
+	HANDLE _hAcceptThread;
+
+	// Worker 스레드 핸들
+	vector<HANDLE> _hWorkerThreadHandles;	
+
 	// Accept 전용 스레드 함수
 	static unsigned __stdcall AcceptThreadProc(void* argument);
 
@@ -63,14 +69,23 @@ protected:
 
 	// ReleaseSession 안에서 반납되는 session을 기준으로 호출
 	virtual void OnClientLeave(Session* leaveSession) = 0;
+	
 public:
 	// 1초 동안 연결 수락 개수
 	int _acceptTPS;
 	// 연결 수락 총 개수
 	int _acceptTotal;
 
+	// recvPacet을 1초 동안 받은 횟수
+	int _recvPacketTPS;
+	// sendPacket을 1초 동안 보낸 횟수
+	int _sendPacketTPS;
+
 	// 서버 시작
 	bool Start(const WCHAR* openIP, int port);
+
+	// 서버 멈춤
+	void Stop();
 
 	// 패킷을 전송
 	void SendPacket(__int64 sessionId, Packet* packet);

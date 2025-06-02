@@ -3,18 +3,18 @@
 
 CoreNetwork::CoreNetwork()
 {
-	WSADATA wsaData;
-	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
-	{
-		DWORD error = WSAGetLastError();
-		std::cout << "WSAStartup failed : " << error << std::endl;
-		return;
-	}
-
 	_acceptTPS = 0;
 	_acceptTotal = 0;
 
-	_sessionId = 0;	
+	_sessionId = 0;
+
+	_listenSocket = NULL;
+	_HCP = NULL;
+
+	_hAcceptThread = NULL;
+	
+	_recvPacketTPS = 0;
+	_sendPacketTPS = 0;
 }
 
 CoreNetwork::~CoreNetwork()
@@ -23,6 +23,17 @@ CoreNetwork::~CoreNetwork()
 
 bool CoreNetwork::Start(const WCHAR* openIP, int port)
 {
+	wcout << L"채팅 서버 시작" << endl;
+
+	WSADATA wsaData;
+	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
+	{
+		DWORD error = WSAGetLastError();
+		std::cout << "WSAStartup failed : " << error << std::endl;
+		return;
+	}
+
+
 	// 리슨 소켓 생성
 	_listenSocket = socket(AF_INET, SOCK_STREAM, 0);
 	if (_listenSocket == INVALID_SOCKET)
@@ -62,8 +73,7 @@ bool CoreNetwork::Start(const WCHAR* openIP, int port)
 	}
 
 	// accept 스레드 생성
-	HANDLE hAcceptThread = (HANDLE)_beginthreadex(NULL, 0, AcceptThreadProc, this, 0, NULL);
-	CloseHandle(hAcceptThread);
+	_hAcceptThread = (HANDLE)_beginthreadex(NULL, 0, AcceptThreadProc, this, 0, NULL);	
 
 	// IOCP 워커 스레드 생성
 	SYSTEM_INFO SI;
@@ -71,9 +81,61 @@ bool CoreNetwork::Start(const WCHAR* openIP, int port)
 
 	for (int i = 0; i < (int)SI.dwNumberOfProcessors; i++)
 	{
-		HANDLE hWorkerThread = (HANDLE)_beginthreadex(NULL, 0, WorkerThreadProc, this, 0, NULL);
-		CloseHandle(hWorkerThread);
+		HANDLE hWorkerThread = (HANDLE)_beginthreadex(NULL, 0, WorkerThreadProc, this, 0, NULL);		
+		_hWorkerThreadHandles.push_back(hWorkerThread);
 	}
+}
+
+void CoreNetwork::Stop()
+{
+	wcout << L"채팅 서버 종료" << endl;
+	
+	// session 연결 종료
+	for (Session* session : _sessions)
+	{
+		if (session != nullptr)
+		{
+			Disconnect(session->sessionId);
+		}
+	}
+
+	// listen 소켓 닫기
+	closesocket(_listenSocket);
+	
+	WSACleanup();
+	
+	// session 할당 해제
+	for (Session* session : _sessions)
+	{
+		delete session->IOBlock;
+		delete session;
+	}
+
+	// session 배열 비우기
+	_sessions.clear();
+
+	// accept 스레드 종료
+	CloseHandle(_hAcceptThread);
+
+	_hAcceptThread = NULL;
+
+	for (HANDLE workerThread : _hWorkerThreadHandles)
+	{
+		CloseHandle(workerThread);
+	}
+
+	_hWorkerThreadHandles.clear();
+
+	// IOCP 핸들 닫기
+	CloseHandle(_HCP);
+	_HCP = NULL;
+		
+	_acceptTPS = 0;
+	_acceptTotal = 0;
+	_sessionId = 0;
+	_listenSocket = NULL;	
+		
+	wcout << L"채팅 서버 종료 완료" << endl;
 }
 
 void CoreNetwork::SendPacket(__int64 sessionId, Packet* packet)
