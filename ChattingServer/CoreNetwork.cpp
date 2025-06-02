@@ -30,7 +30,7 @@ bool CoreNetwork::Start(const WCHAR* openIP, int port)
 	{
 		DWORD error = WSAGetLastError();
 		std::cout << "WSAStartup failed : " << error << std::endl;
-		return;
+		return false;
 	}
 
 
@@ -116,7 +116,6 @@ void CoreNetwork::Stop()
 
 	// accept 스레드 종료
 	CloseHandle(_hAcceptThread);
-
 	_hAcceptThread = NULL;
 
 	for (HANDLE workerThread : _hWorkerThreadHandles)

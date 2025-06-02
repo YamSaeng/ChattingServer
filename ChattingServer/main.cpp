@@ -18,21 +18,25 @@ int main()
 	std::string ipAddress = doc["ipAddress"].GetString();
 	int port = doc["port"].GetInt();	
 
-	gChattingServer.Start(Utils::Convert(ipAddress).c_str(), port);
-
-   	_setmode(_fileno(stdout), _O_U16TEXT);	
+	gChattingServer.Start(Utils::Convert(ipAddress).c_str(), port);   	
 
 	while (true)
 	{
-		wcout << L"===================" << endl << endl;
-		wcout << L"ChattingServer" << endl << endl;
-		wcout << L"acceptTotal : [ " << gChattingServer._acceptTotal << " ]" << endl;
-		wcout << L"acceptTPS : [ " << gChattingServer._acceptTPS << " ]" << endl;
-		wcout << L"===================";
+		cout << "===================" << endl << endl;
+		cout << "ChattingServer" << endl << endl;
+		cout << "acceptTotal : [ " << gChattingServer._acceptTotal << " ]" << endl;
+		cout << "acceptTPS : [ " << gChattingServer._acceptTPS << " ]" << endl;
+		cout << "recvTPS : [ " << gChattingServer._recvPacketTPS << " ]" << endl;
+		cout << "sendTPS : [ " << gChattingServer._sendPacketTPS << " ]" << endl;
+		cout << "===================";
+
+		gChattingServer._acceptTPS = 0;
+		gChattingServer._recvPacketTPS = 0;
+		gChattingServer._sendPacketTPS = 0;
 
 		Sleep(1000);
 
-		system("cls");
+		//system("cls");
 	}
 
 	return 0;
