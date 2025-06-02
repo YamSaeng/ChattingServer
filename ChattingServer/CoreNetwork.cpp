@@ -398,6 +398,8 @@ void CoreNetwork::SendPost(Session* sendSession)
 			break;
 		}
 
+		InterlockedIncrement(&_sendPacketTPS);
+
 		Packet* packet = sendSession->sendQueue.front();
 		sendSession->sendQueue.pop();
 		
@@ -487,6 +489,8 @@ void CoreNetwork::RecvComplete(Session* recvCompleteSesion, const DWORD& transfe
 				break;
 			}			
 		}
+
+		InterlockedIncrement(&_recvPacketTPS);
 
 		// 비정상적으로 너무 큰 패킷이 올경우 연결을 끊음
 		if (encodeHeader.packetLen > PACKET_BUFFER_DEFAULT_SIZE)

@@ -77,9 +77,9 @@ public:
 	int _acceptTotal;
 
 	// recvPacet을 1초 동안 받은 횟수
-	int _recvPacketTPS;
+	LONG _recvPacketTPS;
 	// sendPacket을 1초 동안 보낸 횟수
-	int _sendPacketTPS;
+	LONG _sendPacketTPS;
 
 	// 서버 시작
 	bool Start(const WCHAR* openIP, int port);
