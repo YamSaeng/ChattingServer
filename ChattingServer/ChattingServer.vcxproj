@@ -155,6 +155,7 @@
     <ClInclude Include="CoreNetwork.h" />
     <ClInclude Include="Macro.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="protocol.h" />
     <ClInclude Include="Session.h" />
   </ItemGroup>
   <ItemGroup>
