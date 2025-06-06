@@ -148,7 +148,7 @@ void CoreNetwork::SendPacket(__int64 sessionId, Packet* packet)
 	packet->Encode();
 
 	// 패킷 큐잉
-	sendSession->sendQueue.push(packet);
+	sendSession->sendQueue.Push(packet);
 
 	// WSASend 등록
 	SendPost(sendSession);
@@ -246,28 +246,33 @@ unsigned __stdcall CoreNetwork::WorkerThreadProc(void* argument)
 			{
 				completeRet = GetQueuedCompletionStatus(instance->_HCP, &transferred,
 					(PULONG_PTR)&completeSession, (LPOVERLAPPED*)&myOverlapped, INFINITE);
+				// myOverlapped가 nullptr이라면 GetQueuedCompletionStatus가 실패한 경우라서 return 처리한다.
 				if (myOverlapped == nullptr)
 				{
 					GQCSError = WSAGetLastError();
-					wcout << L"MyOverlapped NULL " << GQCSError << endl;
+					cout << "MyOverlapped NULL " << GQCSError << endl;
 					return -1;
 				}
 
+				// transferred가 0이라면 fin 패킷을 받은것이므로 종료처리한다.
 				if (transferred == 0)
 				{
 					break;
 				}
 
+				// 전달받은 overlapped가 recvOverlapped라면 recv 완료 처리를 진행한다.
 				if (myOverlapped == &completeSession->recvOverlapped)
 				{
 					instance->RecvComplete(completeSession, transferred);
 				}
+				// 전달받은 overlapped가 sendOverlapped라면 send 완료 처리를 진행한다.
 				else if (myOverlapped == &completeSession->sendOverlapped)
 				{
 					instance->SendComplete(completeSession);
 				}
 			} while (0);
 
+			// IO 처리가 하나 끝났으므로 IOCount를 감소시킨다.
 			if (InterlockedDecrement64(&completeSession->IOBlock->IOCount) == 0)
 			{
 				instance->ReleaseSession(completeSession);
@@ -342,7 +347,7 @@ void CoreNetwork::SendPost(Session* sendSession)
 		// 다른 워커 쓰레드가 WSASend를 하지 않도록 막는다.
 		if (InterlockedExchange(&sendSession->isSend, 1) == 0)
 		{
-			sendUseSize = sendSession->sendQueue.size();
+			sendUseSize = sendSession->sendQueue.Size();
 
 			/*
 				보내려고 진입했지만 isSend가 1이라 다른 스레드에서 이미 WSASend 중일 수 있다.
@@ -373,7 +378,7 @@ void CoreNetwork::SendPost(Session* sendSession)
 			{
 				InterlockedExchange(&sendSession->isSend, 0);
 
-				if (!sendSession->sendQueue.empty())
+				if (!sendSession->sendQueue.IsEmpty())
 				{
 					continue;
 				}
@@ -389,19 +394,20 @@ void CoreNetwork::SendPost(Session* sendSession)
 		}
 	} while (0);
 
+	// session이 보내야할 packet의 개수를 지정한다.
 	sendSession->sendPacketCount = sendCount = sendUseSize;
 
+	// 보내야할 패킷의 개수만큼 sendQueue에서 패킷을 꺼내서 WSABUF에 넣는다.
 	for (int i = 0; i < sendCount; i++)
 	{
-		if (sendSession->sendQueue.size() == 0)
+		if (sendSession->sendQueue.Size() == 0)
 		{
 			break;
 		}
 
 		InterlockedIncrement(&_sendPacketTPS);
 
-		Packet* packet = sendSession->sendQueue.front();
-		sendSession->sendQueue.pop();
+		Packet* packet = sendSession->sendQueue.Pop();		
 		
 		sendBuf[i].buf = packet->GetHeaderBufferPtr();
 		sendBuf[i].len = packet->GetUseBufferSize();
@@ -409,10 +415,12 @@ void CoreNetwork::SendPost(Session* sendSession)
 		sendSession->sendPacket[i] = packet;
 	}
 
+	// WSAsend를 걸기 전에 한번 청소해준다.
 	memset(&sendSession->sendOverlapped, 0, sizeof(OVERLAPPED));
 
+	// IOCount를 1 증가시켜 해당 session이 release 대상이 되지 않도록 한다.
 	InterlockedIncrement64(&sendSession->IOBlock->IOCount);
-
+		
 	int WSASendRetval = WSASend(sendSession->clientSocket, sendBuf, sendCount, NULL, 0, (LPWSAOVERLAPPED)&sendSession->sendOverlapped, NULL);
 	if (WSASendRetval == SOCKET_ERROR)
 	{
@@ -446,10 +454,10 @@ void CoreNetwork::ReleaseSession(Session* releaseSession)
 
 	// sendPacket을 호출해서 패킷을 enqueue만 하고 빠질 가능성이 있기 때문에
 	// 이 부분에서 sendQueue의 크기를 확인해서 내용이 남아있으면 해제한다.
-	while (releaseSession->sendQueue.size() > 0)
+	while (releaseSession->sendQueue.Size() > 0)
 	{
-		Packet* deletePacket = releaseSession->sendQueue.front();
-		releaseSession->sendQueue.pop();
+		Packet* deletePacket = releaseSession->sendQueue.Pop();
+		
 		if (deletePacket == nullptr)
 		{
 			continue;
@@ -488,6 +496,10 @@ void CoreNetwork::RecvComplete(Session* recvCompleteSesion, const DWORD& transfe
 				Disconnect(recvCompleteSesion->sessionId);
 				break;
 			}			
+		}
+		else
+		{
+			break;
 		}
 
 		InterlockedIncrement(&_recvPacketTPS);
@@ -528,6 +540,7 @@ void CoreNetwork::SendComplete(Session* sendCompleteSession)
 	for (int i = 0; i < sendCompleteSession->sendPacketCount; i++)
 	{
 		delete sendCompleteSession->sendPacket[i];
+		sendCompleteSession->sendPacket[i] = nullptr;
 	}
 
 	sendCompleteSession->sendPacketCount = 0;
@@ -537,7 +550,7 @@ void CoreNetwork::SendComplete(Session* sendCompleteSession)
 
 	// 만약 위에서 바꾸기 전에 큐잉만 하고 빠질 경우
 	// 여기서 크기를 검사해서 WSASend를 걸어준다.
-	if (sendCompleteSession->sendQueue.size() > 0)
+	if (sendCompleteSession->sendQueue.Size() > 0)
 	{
 		SendPost(sendCompleteSession);
 	}

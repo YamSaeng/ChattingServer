@@ -2,6 +2,7 @@
 
 #include"../Packet.h"
 #include"../RingBuffer.h"
+#include"../SendQueue.h"
 
 #pragma comment(lib, "..\\x64\\Debug\\NetworkLib.lib")
 
@@ -23,10 +24,15 @@ struct Session
 	SOCKADDR_IN clientAddr; // 서버에 접속한 클라 주소
 
 	RingBuffer recvRingBuffer; // recvBuf
-	queue<Packet*> sendQueue; // sendQueue
+	SendQueue sendQueue; // sendQueue	
 
 	OVERLAPPED recvOverlapped = {}; // WSARecv 통지
 	OVERLAPPED sendOverlapped = {};	// WSASend 통지
 
-	IOBlock* IOBlock = nullptr;
+	IOBlock* IOBlock = nullptr; // Session이 사용중인지, 해제되었는지 확인
+	
+	LONG isSend; // 세션에 대해 WSASend 작업을 하고 있는지 안하고 있는지 여부
+
+	vector<Packet*> sendPacket; // 전송할 패킷들을 담아둠
+	LONG sendPacketCount; // 전송한 패킷의 개수를 기록
 };
