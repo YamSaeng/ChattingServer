@@ -3,36 +3,49 @@
 
 DummyClient::DummyClient()
 {
-	memset(&_dummyClientSession, 0, sizeof(DummyClientSession));	
+	_dummyClientSession = nullptr;
+	_isSending = false;
+	_connected = false;
+	_id = -1;
 }
 
 DummyClient::~DummyClient()
 {
-	
+	if (_dummyClientSession)
+	{
+		delete _dummyClientSession;
+		_dummyClientSession = nullptr;
+	}
 }
 
 bool DummyClient::Connect(const wchar_t* ip, int port, int id, HANDLE hIOCP)
 {
-	_dummyClientSession.clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+	_id = id;
 
-	_dummyClientSession.serverAddr.sin_family = AF_INET;
-	_dummyClientSession.serverAddr.sin_port = htons(port);
-	InetPton(AF_INET, ip, &_dummyClientSession.serverAddr.sin_addr);
-
-	if(connect(_dummyClientSession.clientSocket, (SOCKADDR*)&_dummyClientSession.serverAddr, sizeof(_dummyClientSession.serverAddr)) == SOCKET_ERROR) 
+	_dummyClientSession = new DummyClientSession();
+	_dummyClientSession->clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+	if (_dummyClientSession->clientSocket == INVALID_SOCKET)
 	{
-		DWORD error = WSAGetLastError();
+		cout << "DummyClient socket create fail" << WSAGetLastError() << endl;
+		return false;
+	}
 
-		cout << "connect 에러 " << error << endl;
+	_dummyClientSession->serverAddr.sin_family = AF_INET;
+	_dummyClientSession->serverAddr.sin_port = htons(port);
+	InetPton(AF_INET, ip, &_dummyClientSession->serverAddr.sin_addr);
 
-		closesocket(_dummyClientSession.clientSocket);
-		_dummyClientSession.clientSocket = INVALID_SOCKET;
+	if(connect(_dummyClientSession->clientSocket, (SOCKADDR*)&_dummyClientSession->serverAddr, sizeof(_dummyClientSession->serverAddr)) == SOCKET_ERROR)
+	{
+		cout << "connect fail " << WSAGetLastError() << endl;
+
+		closesocket(_dummyClientSession->clientSocket);
+		_dummyClientSession->clientSocket = INVALID_SOCKET;
 		return false;
 	}
 
 	_connected = true;
 
-	CreateIoCompletionPort((HANDLE)_dummyClientSession.clientSocket, hIOCP, (ULONG_PTR)this, 0);	
+	CreateIoCompletionPort((HANDLE)_dummyClientSession->clientSocket, hIOCP, (ULONG_PTR)this, 0);
 
 	RecvPost();
 
@@ -41,10 +54,10 @@ bool DummyClient::Connect(const wchar_t* ip, int port, int id, HANDLE hIOCP)
 
 void DummyClient::Disconnect(void)
 {
-	if (_dummyClientSession.clientSocket != INVALID_SOCKET)
+	if (_dummyClientSession->clientSocket != INVALID_SOCKET)
 	{
-		closesocket(_dummyClientSession.clientSocket);
-		_dummyClientSession.clientSocket = INVALID_SOCKET;
+		closesocket(_dummyClientSession->clientSocket);
+		_dummyClientSession->clientSocket = INVALID_SOCKET;
 	}
 
 	_connected = false;
@@ -57,17 +70,34 @@ void DummyClient::SendRandomMessage(void)
 		return;
 	}
 
-	string msg = "더미 메세지";
-	memcpy(_dummyClientSession.sendBuffer, msg.c_str(), msg.length());
+	if (InterlockedExchange(&_isSending, 1) == 0)
+	{
+		return;
+	}
+
+	const char* samples[] = {
+	"Hello", "Stress Test","Test Send", "Jung", "Bye"};
+
+	string msg = samples[rand() % (sizeof(samples) / sizeof(char*))];
+	memcpy(_dummyClientSession->sendBuffer, msg.c_str(), msg.length());
 
 	WSABUF sendWsabuf;
-	sendWsabuf.buf = _dummyClientSession.sendBuffer;
+	sendWsabuf.buf = _dummyClientSession->sendBuffer;
 	sendWsabuf.len = (ULONG)msg.length();
 
-	memset(&_dummyClientSession.sendOverlapped, 0, sizeof(OVERLAPPED));
+	memset(&_dummyClientSession->sendOverlapped, 0, sizeof(OVERLAPPED));
 
 	DWORD sent;
-	WSASend(_dummyClientSession.clientSocket, &sendWsabuf,1,&sent,0, (LPWSAOVERLAPPED)&_dummyClientSession.sendOverlapped, nullptr);
+	int sendResult = WSASend(_dummyClientSession->clientSocket, &sendWsabuf,1,&sent,0, (LPWSAOVERLAPPED)&_dummyClientSession->sendOverlapped, nullptr);
+	if (sendResult == SOCKET_ERROR)
+	{
+		DWORD error = WSAGetLastError();
+		if (error != WSA_IO_PENDING)
+		{
+			cout << "DummyClient [" << _id << "] WSASend fail" << error << endl;
+			Disconnect();
+		}
+	}
 }
 
 void DummyClient::RecvPost(void)
@@ -78,15 +108,27 @@ void DummyClient::RecvPost(void)
 	}
 
 	WSABUF recvWsabuf;
-	recvWsabuf.buf = _dummyClientSession.recvBuffer;
-	recvWsabuf.len = sizeof(_dummyClientSession.recvBuffer);
+	recvWsabuf.buf = _dummyClientSession->recvBuffer;
+	recvWsabuf.len = sizeof(_dummyClientSession->recvBuffer);
 
 	DWORD recvBytes = 0;
 	DWORD flags = 0;
 
-	memset(&_dummyClientSession.recvOverlapped, 0, sizeof(OVERLAPPED));
+	memset(&_dummyClientSession->recvOverlapped, 0, sizeof(OVERLAPPED));
 
-	WSARecv(_dummyClientSession.clientSocket, &recvWsabuf, 1, &recvBytes, &flags, (LPWSAOVERLAPPED)&_dummyClientSession.recvOverlapped, nullptr);
+	int recvResult = WSARecv(_dummyClientSession->clientSocket, &recvWsabuf, 1, &recvBytes, &flags, (LPWSAOVERLAPPED)&_dummyClientSession->recvOverlapped, nullptr);
+	if (recvResult == SOCKET_ERROR)
+	{
+		DWORD error = WSAGetLastError();
+		if (error != WSA_IO_PENDING)
+		{
+			if (error != WSA_IO_PENDING)
+			{
+				cout << "DummyClient [" << _id << "] WSARecv fail" << error << endl;
+				Disconnect();
+			}
+		}
+	}
 }
 
 void DummyClient::RecvComplete(DWORD transferred)
@@ -97,7 +139,12 @@ void DummyClient::RecvComplete(DWORD transferred)
 		return;
 	}
 
-	_dummyClientSession.recvBuffer[transferred] = '\0';
-	cout << "[Dummy " << _id << "] Received: " << _dummyClientSession.recvBuffer << endl;
+	_dummyClientSession->recvBuffer[transferred] = '\0';
+	cout << "[Dummy " << _id << "] Received: " << _dummyClientSession->recvBuffer << endl;
 	RecvPost();
+}
+
+void DummyClient::SendComplete(void)
+{
+	InterlockedExchange(&_isSending, 0);
 }

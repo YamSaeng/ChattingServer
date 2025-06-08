@@ -85,10 +85,14 @@ unsigned __stdcall DummyClientManager::DummyWorkerThreadProc(void* argument)
 				return -1;
 			}
 
-			if (completeOverlapped == &completeDummyClient->_dummyClientSession.recvOverlapped)
+			if (completeOverlapped == &completeDummyClient->_dummyClientSession->recvOverlapped)
 			{
 				completeDummyClient->RecvComplete(transferred);
 			}			
+			else if (completeOverlapped == &completeDummyClient->_dummyClientSession->sendOverlapped)
+			{
+				completeDummyClient->SendComplete();
+			}
 		}
 	}
 

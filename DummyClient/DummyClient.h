@@ -9,13 +9,14 @@ public:
 	DummyClient();
 	~DummyClient();	
 
-	DummyClientSession _dummyClientSession;
+	DummyClientSession* _dummyClientSession;
 private:
 	int _id;
 	SOCKET _clientSocket;
 	HANDLE _hIOCP;
 
 	bool _connected;
+	LONG _isSending;
 
 public:		
 	bool Connect(const wchar_t* ip, int port, int id, HANDLE hIOCP);
@@ -23,4 +24,5 @@ public:
 	void SendRandomMessage(void);
 	void RecvPost(void);
 	void RecvComplete(DWORD transferred);
+	void SendComplete(void);
 };
