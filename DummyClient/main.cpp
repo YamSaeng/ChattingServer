@@ -1,43 +1,39 @@
 #include"pch.h"
-#include"DummyClient.h"
-
-DummyClient gDummyClient;
+#include"DummyClientManager.h"
 
 int main()
 {
+	DummyClientManager dummyClientManager;
+
 	bool isDummyCountSet = false;
 	bool isDummyStartSet = false;
 	short dummyClientMenuSelectNum = 0;
-	int dummyClientCount = 0;
-
-	_setmode(_fileno(stdout), _O_U16TEXT);
+	int dummyClientCount = 0;	
 
 	while (1)
 	{
-		wcout << L"채팅 더미 클라이언트 시작" << endl;
-		wcout << L"1. 채팅 더미 개수 설정" << endl;
-		wcout << L"2. 채팅 더미 서버 접속 시작" << endl;
-		wcout << L"선택 : ";
+		cout << "채팅 더미 클라이언트 시작" << endl;
+		cout << "1. 채팅 더미 개수 설정" << endl;
+		cout << "2. 채팅 더미 서버 접속 시작" << endl;
+		cout << "선택 : ";
 		cin >> dummyClientMenuSelectNum;
 
 		switch (dummyClientMenuSelectNum)
 		{
 		case 1:
-			wcout << L"생성할 더미 개수 입력 : ";
+			cout << "생성할 더미 개수 입력 : ";
 			cin >> dummyClientCount;			
 			isDummyCountSet = true;
 
-			wcout << endl;
+			cout << endl;
 			break;
 		case 2:
 			if (isDummyCountSet == false)
 			{
-				wcout << L"채팅 더미 개수를 설정하고 접속하세요" << endl;
-				wcout << L"====================================" << endl << endl;
+				cout << "채팅 더미 개수를 설정하고 접속하세요" << endl;
+				cout << "====================================" << endl << endl;
 				break;
-			}
-
-			gDummyClient.DummyClientStart(dummyClientCount);
+			}			
 
 			isDummyStartSet = true;
 			break;
@@ -47,6 +43,10 @@ int main()
 
 		if (isDummyCountSet == true && isDummyStartSet == true)
 		{
+			cout << "더미 설정 완료" << endl;
+			cout << "더미 클라이언트 "<<"["<<dummyClientCount<<"] 개"<<" 시작" << endl;
+
+			dummyClientManager.Start(dummyClientCount, L"127.0.0.1", 8888);
 			break;
 		}		
 	}
