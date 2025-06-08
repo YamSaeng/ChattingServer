@@ -51,9 +51,20 @@ int main()
 		}		
 	}
 
+	system("cls");
+
 	while (1)
 	{
+		cout << "===================" << endl << endl;
+		cout << "DummyClient" << endl << endl;				
+		cout << "sendTPS : [ " << dummyClientManager._sendPacketTPS << " ]" << endl;
+		cout << "===================";
+
+		dummyClientManager._sendPacketTPS = 0;
+
 		Sleep(1000);
+
+		system("cls");
 	}
 
 	return 0;
