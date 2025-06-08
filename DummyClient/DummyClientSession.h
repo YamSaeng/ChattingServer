@@ -1,5 +1,8 @@
 #pragma once
 #include"pch.h"
+#include"../Packet.h"
+
+#pragma comment(lib, "..\\x64\\Debug\\NetworkLib.lib")
 
 struct DummyClientSession
 {
@@ -8,8 +11,8 @@ struct DummyClientSession
 
 	SOCKADDR_IN serverAddr;
 
-	char recvBuffer[1024] = {};
-	char sendBuffer[1024] = {};
+	char recvBuffer[1024] = {};	
+	Packet* sendPacket = nullptr;	
 
 	OVERLAPPED recvOverlapped = {};
 	OVERLAPPED sendOverlapped = {};	

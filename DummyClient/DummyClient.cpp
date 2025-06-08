@@ -70,20 +70,26 @@ void DummyClient::SendRandomMessage(void)
 		return;
 	}
 
-	if (InterlockedExchange(&_isSending, 1) == 0)
+	if (!InterlockedExchange(&_isSending, 1) == 0)
 	{
 		return;
-	}
+	}	
+
+	WSABUF sendWsabuf;
 
 	const char* samples[] = {
 	"Hello", "Stress Test","Test Send", "Jung", "Bye"};
-
 	string msg = samples[rand() % (sizeof(samples) / sizeof(char*))];
-	memcpy(_dummyClientSession->sendBuffer, msg.c_str(), msg.length());
 
-	WSABUF sendWsabuf;
-	sendWsabuf.buf = _dummyClientSession->sendBuffer;
-	sendWsabuf.len = (ULONG)msg.length();
+	Packet* packet = new Packet();		
+	*packet << make_pair(msg.c_str(), (int)msg.length());
+
+	packet->Encode();	
+
+	sendWsabuf.buf = packet->GetHeaderBufferPtr();
+	sendWsabuf.len = packet->GetUseBufferSize();
+
+	_dummyClientSession->sendPacket = packet;	
 
 	memset(&_dummyClientSession->sendOverlapped, 0, sizeof(OVERLAPPED));
 
@@ -146,5 +152,11 @@ void DummyClient::RecvComplete(DWORD transferred)
 
 void DummyClient::SendComplete(void)
 {
+	if (_dummyClientSession->sendPacket != nullptr)
+	{
+		delete _dummyClientSession->sendPacket;
+		_dummyClientSession->sendPacket = nullptr;
+	}
+	
 	InterlockedExchange(&_isSending, 0);
 }

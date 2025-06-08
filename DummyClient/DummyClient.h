@@ -10,14 +10,13 @@ public:
 	~DummyClient();	
 
 	DummyClientSession* _dummyClientSession;
+	bool _connected;
 private:
 	int _id;
 	SOCKET _clientSocket;
 	HANDLE _hIOCP;
 
-	bool _connected;
 	LONG _isSending;
-
 public:		
 	bool Connect(const wchar_t* ip, int port, int id, HANDLE hIOCP);
 	void Disconnect(void);
