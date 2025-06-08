@@ -1,3 +1,4 @@
+#include "CoreNetwork.h"
 #include"pch.h"
 #include"CoreNetwork.h"
 
@@ -32,7 +33,6 @@ bool CoreNetwork::Start(const WCHAR* openIP, int port)
 		std::cout << "WSAStartup failed : " << error << std::endl;
 		return false;
 	}
-
 
 	// 리슨 소켓 생성
 	_listenSocket = socket(AF_INET, SOCK_STREAM, 0);
@@ -178,6 +178,11 @@ void CoreNetwork::Disconnect(__int64 sessionId)
 	ReturnSession(disconnectSession);
 }
 
+int CoreNetwork::SessionCount()
+{
+	return (int)_sessions.size();
+}
+
 unsigned __stdcall CoreNetwork::AcceptThreadProc(void* argument)
 {
 	CoreNetwork* instance = (CoreNetwork*)argument;
@@ -218,7 +223,7 @@ unsigned __stdcall CoreNetwork::AcceptThreadProc(void* argument)
 			newSession->IOBlock->IsRelease = 0;
 
 			instance->OnClientJoin(newSession);
-			instance->RecvPost(newSession);
+			instance->RecvPost(newSession, true);
 
 			// sessions에 저장
 			instance->_sessions.push_back(newSession);
@@ -465,6 +470,8 @@ void CoreNetwork::ReleaseSession(Session* releaseSession)
 
 		delete deletePacket;
 	}
+
+	_sessions.erase(remove_if(_sessions.begin(), _sessions.end(), [releaseSession](Session* eraseSession) {return eraseSession->sessionId == releaseSession->sessionId; }), _sessions.end());
 }
 
 void CoreNetwork::RecvComplete(Session* recvCompleteSesion, const DWORD& transferred)
@@ -488,7 +495,7 @@ void CoreNetwork::RecvComplete(Session* recvCompleteSesion, const DWORD& transfe
 
 		// 헤더를 뽑아본다.
 		recvCompleteSesion->recvRingBuffer.Peek((char*)&encodeHeader, sizeof(Packet::EncodeHeader));
-		if (encodeHeader.packetLen + sizeof(Packet::EncodeHeader) > recvCompleteSesion->recvRingBuffer.GetUseSize())
+		if (encodeHeader.packetLen + sizeof(Packet::EncodeHeader) >= recvCompleteSesion->recvRingBuffer.GetUseSize())
 		{
 			// 1차 패킷 코드인 52값이 아니라면 나감
 			if (encodeHeader.packetCode != 52)
@@ -532,6 +539,8 @@ void CoreNetwork::RecvComplete(Session* recvCompleteSesion, const DWORD& transfe
 	}
 	
 	delete packet;
+
+	RecvPost(recvCompleteSesion);
 }
 
 void CoreNetwork::SendComplete(Session* sendCompleteSession)

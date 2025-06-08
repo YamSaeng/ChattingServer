@@ -92,4 +92,7 @@ public:
 
 	// 끊기
 	void Disconnect(__int64 sessionId);
+
+	// 접속중인 Session 개수
+	int SessionCount();
 };
