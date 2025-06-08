@@ -24,6 +24,9 @@
     <ClCompile Include="pch.cpp">
       <Filter>헤더 파일</Filter>
     </ClCompile>
+    <ClCompile Include="DummyClientManager.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DummyClient.h">
@@ -33,6 +36,9 @@
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="pch.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="DummyClientManager.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>
