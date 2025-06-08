@@ -1,20 +1,15 @@
 #pragma once
 #include"pch.h"
 
-#include"../Packet.h"
-#include"../RingBuffer.h"
-
-#pragma comment(lib, "..\\x64\\Debug\\NetworkLib.lib")
-
 struct DummyClientSession
 {
 	LONG dummyClientSessionId = 0;
 	SOCKET clientSocket;
 
-	SOCKADDR_IN serverAddr; // 立加且 辑滚 林家
+	SOCKADDR_IN serverAddr;
 
-	RingBuffer recvRingBuffer; // recvBuf
-	queue<Packet> sendQueue; // sendQueue
+	char recvBuffer[1024] = {};
+	char sendBuffer[1024] = {};
 
 	OVERLAPPED recvOverlapped = {};
 	OVERLAPPED sendOverlapped = {};	
