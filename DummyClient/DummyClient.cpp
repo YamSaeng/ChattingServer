@@ -1,100 +1,103 @@
 #include"pch.h"
 #include"DummyClient.h"
-#include"DummyClientSession.h"
 
 DummyClient::DummyClient()
 {
-	WSADATA WSA;
-	if (WSAStartup(MAKEWORD(2, 2), &WSA) != 0)
-	{
-		DWORD error = WSAGetLastError();
-		wprintf(L"WSAStartup Error %d\n", error);
-	}
-
-	_dummyClientSessionId = 0;
-
-	// 비신호, 자동 리셋 상태로 이벤트 생성
-	_connetThreadWakeEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
-
-	_duumyClientCount = 0;
-
-	_dummyClientHCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
-	if (_dummyClientHCP == NULL)
-	{
-		DWORD error = WSAGetLastError();
-		std::cout << "CreateIoCompletionPort failed : " << error << std::endl;
-	}
-
-	SYSTEM_INFO SI;
-	GetSystemInfo(&SI);
-
-	HANDLE hConnectThread = (HANDLE)_beginthreadex(NULL, 0, ConnectThreadProc, this, 0, NULL);
-	CloseHandle(hConnectThread);
-
-	for (int i = 0; i < SI.dwNumberOfProcessors; i++)
-	{
-		HANDLE hWorkerThread = (HANDLE)_beginthreadex(NULL, 0, WorkerThreadProc, this, 0, NULL);
-		CloseHandle(hWorkerThread);
-	}
+	memset(&_dummyClientSession, 0, sizeof(DummyClientSession));	
 }
 
 DummyClient::~DummyClient()
 {
+	
 }
 
-unsigned __stdcall DummyClient::ConnectThreadProc(void* argument)
+bool DummyClient::Connect(const wchar_t* ip, int port, int id, HANDLE hIOCP)
 {
-	DummyClient* instance = (DummyClient*)argument;
+	_dummyClientSession.clientSocket = socket(AF_INET, SOCK_STREAM, 0);
 
-	if (instance != nullptr)
+	_dummyClientSession.serverAddr.sin_family = AF_INET;
+	_dummyClientSession.serverAddr.sin_port = htons(port);
+	InetPton(AF_INET, ip, &_dummyClientSession.serverAddr.sin_addr);
+
+	if(connect(_dummyClientSession.clientSocket, (SOCKADDR*)&_dummyClientSession.serverAddr, sizeof(_dummyClientSession.serverAddr)) == SOCKET_ERROR) 
 	{
-		SOCKADDR_IN serverAddr;
-		memset(&serverAddr, 0, sizeof(serverAddr));
-		serverAddr.sin_family = AF_INET;
-		InetPton(AF_INET, L"127.0.0.1", &serverAddr.sin_addr);
-		serverAddr.sin_port = htons(8888);
+		DWORD error = WSAGetLastError();
 
-		WaitForSingleObject(instance->_connetThreadWakeEvent, INFINITE);
+		cout << "connect 에러 " << error << endl;
 
-		for (int i = 0; i < instance->_duumyClientCount; i++)
-		{
-			DummyClientSession* dummyClientSession = new DummyClientSession();
-			dummyClientSession->clientSocket = socket(AF_INET, SOCK_STREAM, 0);
-
-			int connectRet = connect(dummyClientSession->clientSocket, (SOCKADDR*)&serverAddr, sizeof(dummyClientSession->serverAddr));
-			if (connectRet == SOCKET_ERROR)
-			{
-				DWORD connectError = WSAGetLastError();
-				wcout << L"connect Error %d \n" << endl;
-				break;
-			}
-
-			dummyClientSession->dummyClientSessionId = ++instance->_dummyClientSessionId;
-			dummyClientSession->serverAddr = serverAddr;
-
-			instance->_dummyClientList.push_back(dummyClientSession);
-		}
+		closesocket(_dummyClientSession.clientSocket);
+		_dummyClientSession.clientSocket = INVALID_SOCKET;
+		return false;
 	}
 
-	return 0;
+	_connected = true;
+
+	CreateIoCompletionPort((HANDLE)_dummyClientSession.clientSocket, hIOCP, (ULONG_PTR)this, 0);	
+
+	RecvPost();
+
+	return true;
 }
 
-unsigned __stdcall DummyClient::WorkerThreadProc(void* argument)
+void DummyClient::Disconnect(void)
 {
-	return 0;
-}
-
-void DummyClient::DummyClientStart(int dummyClientCount)
-{
-	if (dummyClientCount <= 0)
+	if (_dummyClientSession.clientSocket != INVALID_SOCKET)
 	{
-		wcout << L"1개 이상의 더미를 생성하세요" << endl;
+		closesocket(_dummyClientSession.clientSocket);
+		_dummyClientSession.clientSocket = INVALID_SOCKET;
+	}
+
+	_connected = false;
+}
+
+void DummyClient::SendRandomMessage(void)
+{
+	if (_connected == false)
+	{
 		return;
 	}
 
-	_duumyClientCount = dummyClientCount;	
+	string msg = "더미 메세지";
+	memcpy(_dummyClientSession.sendBuffer, msg.c_str(), msg.length());
 
-	wcout << L"더미 클라이언트 시작 더미 개수 [" << _dummyClientList.size() << L"] 개" << endl;
+	WSABUF sendWsabuf;
+	sendWsabuf.buf = _dummyClientSession.sendBuffer;
+	sendWsabuf.len = (ULONG)msg.length();
 
-	SetEvent(_connetThreadWakeEvent);
+	memset(&_dummyClientSession.sendOverlapped, 0, sizeof(OVERLAPPED));
+
+	DWORD sent;
+	WSASend(_dummyClientSession.clientSocket, &sendWsabuf,1,&sent,0, (LPWSAOVERLAPPED)&_dummyClientSession.sendOverlapped, nullptr);
+}
+
+void DummyClient::RecvPost(void)
+{
+	if (_connected == false)
+	{
+		return;
+	}
+
+	WSABUF recvWsabuf;
+	recvWsabuf.buf = _dummyClientSession.recvBuffer;
+	recvWsabuf.len = sizeof(_dummyClientSession.recvBuffer);
+
+	DWORD recvBytes = 0;
+	DWORD flags = 0;
+
+	memset(&_dummyClientSession.recvOverlapped, 0, sizeof(OVERLAPPED));
+
+	WSARecv(_dummyClientSession.clientSocket, &recvWsabuf, 1, &recvBytes, &flags, (LPWSAOVERLAPPED)&_dummyClientSession.recvOverlapped, nullptr);
+}
+
+void DummyClient::RecvComplete(DWORD transferred)
+{
+	if (transferred == 0)
+	{
+		Disconnect();
+		return;
+	}
+
+	_dummyClientSession.recvBuffer[transferred] = '\0';
+	cout << "[Dummy " << _id << "] Received: " << _dummyClientSession.recvBuffer << endl;
+	RecvPost();
 }

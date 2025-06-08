@@ -97,5 +97,5 @@ unsigned __stdcall DummyClientManager::DummyWorkerThreadProc(void* argument)
 
 unsigned __stdcall DummyClientManager::DummySendThreadProc(void* argument)
 {
-	
+	return 0;
 }

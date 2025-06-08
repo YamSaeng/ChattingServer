@@ -8,19 +8,19 @@ class DummyClient
 public:
 	DummyClient();
 	~DummyClient();	
+
+	DummyClientSession _dummyClientSession;
 private:
-	HANDLE _dummyClientHCP;
+	int _id;
+	SOCKET _clientSocket;
+	HANDLE _hIOCP;
 
-	LONG _dummyClientSessionId;
+	bool _connected;
 
-	HANDLE _connetThreadWakeEvent;
-
-	static unsigned __stdcall ConnectThreadProc(void* argument);
-
-	static unsigned __stdcall WorkerThreadProc(void* argument);
-public:
-	int _duumyClientCount;
-	list<DummyClientSession*> _dummyClientList;
-	
-	void DummyClientStart(int dummyClientCount);
+public:		
+	bool Connect(const wchar_t* ip, int port, int id, HANDLE hIOCP);
+	void Disconnect(void);
+	void SendRandomMessage(void);
+	void RecvPost(void);
+	void RecvComplete(DWORD transferred);
 };
