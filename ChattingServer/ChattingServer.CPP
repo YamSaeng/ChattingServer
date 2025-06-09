@@ -17,6 +17,7 @@ void ChattingServer::PacketProcReqChat(__int64 sessionId, Packet* packet)
 	*packet >> chatLen;
 
 	string chatMessage;	
+	chatMessage.resize(chatLen);
 	*packet >> make_pair(chatMessage.data(), chatLen);
 
 	short packetType = (short)en_CHATTING_SERVER_PACKET_S2C_CHAT;
