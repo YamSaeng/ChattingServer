@@ -400,7 +400,7 @@ void CoreNetwork::SendPost(Session* sendSession)
 	} while (0);	
 
 	// 보내야할 패킷의 개수만큼 sendQueue에서 패킷을 꺼내서 WSABUF에 넣는다.
-	for (int i = 0; i < sendCount; i++)
+	for (int i = 0; i < sendUseSize; i++)
 	{
 		if (sendSession->sendQueue.Size() == 0)
 		{
@@ -423,7 +423,7 @@ void CoreNetwork::SendPost(Session* sendSession)
 	// IOCount를 1 증가시켜 해당 session이 release 대상이 되지 않도록 한다.
 	InterlockedIncrement64(&sendSession->IOBlock->IOCount);
 		
-	int WSASendRetval = WSASend(sendSession->clientSocket, sendBuf, sendCount, NULL, 0, (LPWSAOVERLAPPED)&sendSession->sendOverlapped, NULL);
+	int WSASendRetval = WSASend(sendSession->clientSocket, sendBuf, sendUseSize, NULL, 0, (LPWSAOVERLAPPED)&sendSession->sendOverlapped, NULL);
 	if (WSASendRetval == SOCKET_ERROR)
 	{
 		DWORD error = WSAGetLastError();
@@ -489,20 +489,18 @@ void CoreNetwork::RecvComplete(Session* recvCompleteSesion, const DWORD& transfe
 		{
 			break;
 		}
-
+		
 		// 헤더를 뽑아본다.
 		recvCompleteSesion->recvRingBuffer.Peek((char*)&encodeHeader, sizeof(Packet::EncodeHeader));
-		if (encodeHeader.packetLen + sizeof(Packet::EncodeHeader) >= recvCompleteSesion->recvRingBuffer.GetUseSize())
+		if (recvCompleteSesion->recvRingBuffer.GetUseSize() < encodeHeader.packetLen + sizeof(Packet::EncodeHeader))
 		{
-			// 1차 패킷 코드인 52값이 아니라면 나감
-			if (encodeHeader.packetCode != 52)
-			{
-				Disconnect(recvCompleteSesion->sessionId);
-				break;
-			}			
+			break;
 		}
-		else
+
+		// 1차 패킷 코드인 52값이 아니라면 나감
+		if (encodeHeader.packetCode != 52)
 		{
+			Disconnect(recvCompleteSesion->sessionId);
 			break;
 		}
 
