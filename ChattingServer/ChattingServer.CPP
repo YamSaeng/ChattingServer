@@ -4,7 +4,7 @@
 
 ChattingServer::ChattingServer()
 {
-	packetProc[en_CHATTING_SERVER_PACKET_C2S_CHAT] = &ChattingServer::PacketProcReqChat;
+	packetProc[en_CHATTING_SERVER_PACKET_C2S_CHAT] = &ChattingServer::PacketProcReqChat;	
 }
 
 ChattingServer::~ChattingServer()
@@ -13,7 +13,30 @@ ChattingServer::~ChattingServer()
 
 void ChattingServer::PacketProcReqChat(__int64 sessionId, Packet* packet)
 {
+	int chatLen;
+	*packet >> chatLen;
 
+	string chatMessage;	
+	*packet >> make_pair(chatMessage.data(), chatLen);
+
+	short packetType = (short)en_CHATTING_SERVER_PACKET_S2C_CHAT;
+	
+	Packet* s2cChatPacket = MakePacketProcResChat(chatMessage);
+
+	for (auto session : _sessions)
+	{
+		SendPacket(session->sessionId, s2cChatPacket);
+	}
+}
+
+Packet* ChattingServer::MakePacketProcResChat(string& chatMessage)
+{
+	Packet* s2cChatPacket = new Packet();
+	short packetType = (short)en_CHATTING_SERVER_PACKET_S2C_CHAT;
+	int chatLen = (int)chatMessage.length();
+	*s2cChatPacket << make_pair(chatMessage.c_str(), chatLen);
+
+	return s2cChatPacket;
 }
 
 void ChattingServer::OnClientJoin(Session* newSession)
