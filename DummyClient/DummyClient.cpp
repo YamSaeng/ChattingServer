@@ -1,5 +1,6 @@
 #include"pch.h"
 #include"DummyClient.h"
+#include"../protocol.h"
 
 DummyClient::DummyClient()
 {
@@ -80,21 +81,24 @@ void DummyClient::SendRandomMessage(void)
 	const char* samples[] = {
 	"Hello", "Stress Test","Test Send", "Jung", "Bye"};
 	string msg = samples[rand() % (sizeof(samples) / sizeof(char*))];
+		
+	Packet* c2sChatPacket = new Packet();	
+	short packetType = (short)en_CHATTING_SERVER_PACKET_C2S_CHAT;	
+	*c2sChatPacket << packetType;
+	*c2sChatPacket << make_pair(msg.c_str(), (int)msg.length());
 
-	Packet* packet = new Packet();		
-	*packet << make_pair(msg.c_str(), (int)msg.length());
+	c2sChatPacket->Encode();
 
-	packet->Encode();	
+	sendWsabuf.buf = c2sChatPacket->GetHeaderBufferPtr();
+	sendWsabuf.len = c2sChatPacket->GetUseBufferSize();
 
-	sendWsabuf.buf = packet->GetHeaderBufferPtr();
-	sendWsabuf.len = packet->GetUseBufferSize();
-
-	_dummyClientSession->sendPacket = packet;	
+	_dummyClientSession->sendPacket = c2sChatPacket;
 
 	memset(&_dummyClientSession->sendOverlapped, 0, sizeof(OVERLAPPED));
 
 	DWORD sent;
-	int sendResult = WSASend(_dummyClientSession->clientSocket, &sendWsabuf,1,&sent,0, (LPWSAOVERLAPPED)&_dummyClientSession->sendOverlapped, nullptr);
+	int sendResult = WSASend(_dummyClientSession->clientSocket, &sendWsabuf,1,&sent,0,
+		(LPWSAOVERLAPPED)&_dummyClientSession->sendOverlapped, nullptr);
 	if (sendResult == SOCKET_ERROR)
 	{
 		DWORD error = WSAGetLastError();
@@ -113,16 +117,32 @@ void DummyClient::RecvPost(void)
 		return;
 	}
 
-	WSABUF recvWsabuf;
-	recvWsabuf.buf = _dummyClientSession->recvBuffer;
-	recvWsabuf.len = sizeof(_dummyClientSession->recvBuffer);
+	int recvBuffCount = 0;
+	WSABUF recvWsabuf[2];
 
-	DWORD recvBytes = 0;
-	DWORD flags = 0;
+	int directEnqueueSize = _dummyClientSession->recvRingBuffer.GetDirectEnqueueSize();
+	int recvRingBuffFreeSize = _dummyClientSession->recvRingBuffer.GetFreeSize();
+
+	if (recvRingBuffFreeSize > directEnqueueSize)
+	{
+		recvBuffCount = 2;
+		recvWsabuf[0].buf = _dummyClientSession->recvRingBuffer.GetRearBufferPtr();
+		recvWsabuf[0].len = directEnqueueSize;
+
+		recvWsabuf[1].buf = _dummyClientSession->recvRingBuffer.GetBufferPtr();
+		recvWsabuf[1].len = recvRingBuffFreeSize - directEnqueueSize;
+	}
+	else
+	{
+		recvBuffCount = 1;
+		recvWsabuf[0].buf = _dummyClientSession->recvRingBuffer.GetRearBufferPtr();
+		recvWsabuf[0].len = directEnqueueSize;
+	}	
 
 	memset(&_dummyClientSession->recvOverlapped, 0, sizeof(OVERLAPPED));
 
-	int recvResult = WSARecv(_dummyClientSession->clientSocket, &recvWsabuf, 1, &recvBytes, &flags, (LPWSAOVERLAPPED)&_dummyClientSession->recvOverlapped, nullptr);
+	DWORD flags = 0;
+	int recvResult = WSARecv(_dummyClientSession->clientSocket, recvWsabuf, recvBuffCount, NULL, &flags, (LPWSAOVERLAPPED)&_dummyClientSession->recvOverlapped, NULL);
 	if (recvResult == SOCKET_ERROR)
 	{
 		DWORD error = WSAGetLastError();
@@ -143,10 +163,59 @@ void DummyClient::RecvComplete(DWORD transferred)
 	{
 		Disconnect();
 		return;
-	}
+	}	
 
-	_dummyClientSession->recvBuffer[transferred] = '\0';
-	cout << "[Dummy " << _id << "] Received: " << _dummyClientSession->recvBuffer << endl;
+	_dummyClientSession->recvRingBuffer.MoveRear(transferred);
+
+	int loopCount = 0;
+	const int MAX_PACKET_LOOP = 64;
+	
+	Packet::EncodeHeader encodeHeader;
+	Packet* packet = new Packet();
+
+	while (loopCount++ < MAX_PACKET_LOOP)
+	{
+		packet->Clear();
+
+		if (_dummyClientSession->recvRingBuffer.GetUseSize() < sizeof(Packet::EncodeHeader))
+		{
+			break;
+		}			
+
+		_dummyClientSession->recvRingBuffer.Peek((char*)&encodeHeader, sizeof(Packet::EncodeHeader));
+		if (_dummyClientSession->recvRingBuffer.GetUseSize() < encodeHeader.packetLen + sizeof(Packet::EncodeHeader))
+		{
+			break;
+		}
+
+		if (encodeHeader.packetCode != 52)
+		{
+			Disconnect();
+			break;
+		}
+
+		_dummyClientSession->recvRingBuffer.MoveFront(sizeof(Packet::EncodeHeader));
+		_dummyClientSession->recvRingBuffer.Dequeue(packet->GetRearBufferPtr(), encodeHeader.packetLen);
+		packet->SetHeader((char*)&encodeHeader, sizeof(Packet::EncodeHeader));
+		packet->MoveRearPosition(encodeHeader.packetLen);
+
+		if (!packet->Decode())
+		{
+			Disconnect();
+			break;
+		}		
+
+		int chatLen;
+		*packet >> chatLen;
+
+		string chatMessage;
+		chatMessage.resize(chatLen);
+		*packet >> make_pair(chatMessage.data(), chatLen);
+
+		cout << "[Dummy " << _id << "] Received: " << chatMessage.c_str() << endl;
+	}		
+	
+	delete packet;	
 	RecvPost();
 }
 
