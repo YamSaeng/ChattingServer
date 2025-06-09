@@ -23,10 +23,7 @@ private:
 	SOCKET _listenSocket;
 
 	// 서버에 접속한 sessionId;
-	INT64 _sessionId;
-
-	// 서버에서 관리할 session 배열
-	vector<Session*> _sessions;
+	INT64 _sessionId;	
 
 	// Accept 스레드 핸들
 	HANDLE _hAcceptThread;
@@ -55,6 +52,9 @@ private:
 	// WSASend 완료시 호출하는 함수
 	void SendComplete(Session* sendCompleteSession);
 protected:
+	// 서버에서 관리할 session 배열
+	vector<Session*> _sessions;
+
 	// accept 호출 후 접속한 클라를 대상으로 호출하는 함수
 	virtual void OnClientJoin(Session* newSession) = 0;
 

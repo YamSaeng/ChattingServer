@@ -210,7 +210,7 @@ unsigned __stdcall CoreNetwork::AcceptThreadProc(void* argument)
 			// 세션 할당
 			Session* newSession = new Session();			
 
-			newSession->sessionId = ++instance->_sessionId;
+			newSession->sessionId = instance->_sessionId++;
 			newSession->clientAddr = clientAddr;
 			newSession->clientSocket = clientSock;
 
@@ -397,10 +397,7 @@ void CoreNetwork::SendPost(Session* sendSession)
 		{
 			return;
 		}
-	} while (0);
-
-	// session이 보내야할 packet의 개수를 지정한다.
-	sendSession->sendPacketCount = sendCount = sendUseSize;
+	} while (0);	
 
 	// 보내야할 패킷의 개수만큼 sendQueue에서 패킷을 꺼내서 WSABUF에 넣는다.
 	for (int i = 0; i < sendCount; i++)
@@ -417,7 +414,7 @@ void CoreNetwork::SendPost(Session* sendSession)
 		sendBuf[i].buf = packet->GetHeaderBufferPtr();
 		sendBuf[i].len = packet->GetUseBufferSize();
 
-		sendSession->sendPacket[i] = packet;
+		sendSession->sendPacket.push_back(packet);		
 	}
 
 	// WSAsend를 걸기 전에 한번 청소해준다.
@@ -545,14 +542,12 @@ void CoreNetwork::RecvComplete(Session* recvCompleteSesion, const DWORD& transfe
 
 void CoreNetwork::SendComplete(Session* sendCompleteSession)
 {
-	// 전송 완료된 패킷을 정리한다.
-	for (int i = 0; i < sendCompleteSession->sendPacketCount; i++)
+	for (auto sendCompletePacket : sendCompleteSession->sendPacket)
 	{
-		delete sendCompleteSession->sendPacket[i];
-		sendCompleteSession->sendPacket[i] = nullptr;
+		delete sendCompletePacket;
 	}
 
-	sendCompleteSession->sendPacketCount = 0;
+	sendCompleteSession->sendPacket.clear();		
 
 	// isSend를 0 으로 바꿔서 WSASend를 걸수 있도록 해준다.
 	InterlockedExchange(&sendCompleteSession->isSend, 0);
