@@ -107,7 +107,8 @@ void CoreNetwork::Stop()
 	// session 할당 해제
 	for (Session* session : _sessions)
 	{
-		delete session->IOBlock;
+		closesocket(session->clientSocket);
+		delete session->ioBlock;
 		delete session;
 	}
 
@@ -166,7 +167,7 @@ void CoreNetwork::Disconnect(__int64 sessionId)
 		return;
 	}
 
-	if (disconnectSession->IOBlock->IOCount == 0)
+	if (disconnectSession->ioBlock->ioCount == 0)
 	{
 		ReleaseSession(disconnectSession);
 	}
@@ -214,13 +215,13 @@ unsigned __stdcall CoreNetwork::AcceptThreadProc(void* argument)
 			newSession->clientAddr = clientAddr;
 			newSession->clientSocket = clientSock;
 
-			newSession->IOBlock = new IOBlock();			
+			newSession->ioBlock = new IOBlock();			
 
 			// IOCP에 등록
 			CreateIoCompletionPort((HANDLE)newSession->clientSocket, instance->_HCP, (ULONG_PTR)newSession, 0);
 
-			newSession->IOBlock->IOCount++;
-			newSession->IOBlock->IsRelease = 0;
+			newSession->ioBlock->ioCount++;
+			newSession->ioBlock->IsRelease = 0;
 
 			instance->OnClientJoin(newSession);
 			instance->RecvPost(newSession, true);
@@ -278,7 +279,7 @@ unsigned __stdcall CoreNetwork::WorkerThreadProc(void* argument)
 			} while (0);
 
 			// IO 처리가 하나 끝났으므로 IOCount를 감소시킨다.
-			if (InterlockedDecrement64(&completeSession->IOBlock->IOCount) == 0)
+			if (InterlockedDecrement64(&completeSession->ioBlock->ioCount) == 0)
 			{
 				instance->ReleaseSession(completeSession);
 			}
@@ -321,7 +322,7 @@ void CoreNetwork::RecvPost(Session* recvSession, bool isAcceptRecvPost)
 		
 	if (isAcceptRecvPost == false)
 	{
-		InterlockedIncrement64(&recvSession->IOBlock->IOCount);
+		InterlockedIncrement64(&recvSession->ioBlock->ioCount);
 	}	
 
 	DWORD flags = 0;
@@ -332,7 +333,7 @@ void CoreNetwork::RecvPost(Session* recvSession, bool isAcceptRecvPost)
 		DWORD error = WSAGetLastError();
 		if (error != ERROR_IO_PENDING)
 		{
-			if (InterlockedDecrement64(&recvSession->IOBlock->IOCount) == 0)
+			if (InterlockedDecrement64(&recvSession->ioBlock->ioCount) == 0)
 			{
 				ReleaseSession(recvSession);
 			}
@@ -414,14 +415,14 @@ void CoreNetwork::SendPost(Session* sendSession)
 		sendBuf[i].buf = packet->GetHeaderBufferPtr();
 		sendBuf[i].len = packet->GetUseBufferSize();
 
-		sendSession->sendPacket.push_back(packet);		
+		sendSession->sendPacket.Push(packet);		
 	}
 
 	// WSAsend를 걸기 전에 한번 청소해준다.
 	memset(&sendSession->sendOverlapped, 0, sizeof(OVERLAPPED));
 
 	// IOCount를 1 증가시켜 해당 session이 release 대상이 되지 않도록 한다.
-	InterlockedIncrement64(&sendSession->IOBlock->IOCount);
+	InterlockedIncrement64(&sendSession->ioBlock->ioCount);
 		
 	int WSASendRetval = WSASend(sendSession->clientSocket, sendBuf, sendUseSize, NULL, 0, (LPWSAOVERLAPPED)&sendSession->sendOverlapped, NULL);
 	if (WSASendRetval == SOCKET_ERROR)
@@ -429,7 +430,7 @@ void CoreNetwork::SendPost(Session* sendSession)
 		DWORD error = WSAGetLastError();
 		if (error != ERROR_IO_PENDING)
 		{
-			if (InterlockedDecrement64(&sendSession->IOBlock->IOCount) == 0)
+			if (InterlockedDecrement64(&sendSession->ioBlock->ioCount) == 0)
 			{
 				ReleaseSession(sendSession);
 			}
@@ -440,13 +441,13 @@ void CoreNetwork::SendPost(Session* sendSession)
 void CoreNetwork::ReleaseSession(Session* releaseSession)
 {
 	IOBlock compareBlock;
-	compareBlock.IOCount = 0;
+	compareBlock.ioCount = 0;
 	compareBlock.IsRelease = 0;
 
 	// release Session에 대해서 더블 CAS를 통해
 	// IOCount가 0 인지( 사용중인지 아닌지 확인 )와
 	// IsRelease가 true 인지( Release를 한 세션 인지 확인 )를 확인한다.
-	if (!InterlockedCompareExchange128((LONG64*)releaseSession->IOBlock, (LONG64)true, (LONG64)0, (LONG64*)&compareBlock))
+	if (!InterlockedCompareExchange128((LONG64*)releaseSession->ioBlock, (LONG64)true, (LONG64)0, (LONG64*)&compareBlock))
 	{
 		return;
 	}
@@ -467,6 +468,9 @@ void CoreNetwork::ReleaseSession(Session* releaseSession)
 
 		delete deletePacket;
 	}
+
+	closesocket(releaseSession->clientSocket);
+	delete releaseSession->ioBlock;
 
 	_sessions.erase(remove_if(_sessions.begin(), _sessions.end(), [releaseSession](Session* eraseSession) {return eraseSession->sessionId == releaseSession->sessionId; }), _sessions.end());
 }
@@ -540,12 +544,7 @@ void CoreNetwork::RecvComplete(Session* recvCompleteSesion, const DWORD& transfe
 
 void CoreNetwork::SendComplete(Session* sendCompleteSession)
 {
-	for (auto sendCompletePacket : sendCompleteSession->sendPacket)
-	{
-		delete sendCompletePacket;
-	}
-
-	sendCompleteSession->sendPacket.clear();		
+	sendCompleteSession->sendPacket.Clear();	
 
 	// isSend를 0 으로 바꿔서 WSASend를 걸수 있도록 해준다.
 	InterlockedExchange(&sendCompleteSession->isSend, 0);
@@ -569,18 +568,18 @@ Session* CoreNetwork::FindSession(__int64 sessionId)
 	}
 
 	// 만약 session이 release 작업 예정이라면 나간다.
-	if (findSession->IOBlock->IsRelease == 1)
+	if (findSession->ioBlock->IsRelease == 1)
 	{
 		return nullptr;
 	}	
 
 	// IOCount를 1 증가시켰을 때 그 값이 1인지 확인한다.
 	// 1 이라면 해당 session이 release 중이거나 예정임을 알 수 있다.
-	if (InterlockedIncrement64(&findSession->IOBlock->IOCount) == 1)
+	if (InterlockedIncrement64(&findSession->ioBlock->ioCount) == 1)
 	{
 		// 여기서 IOCount를 1 감소시켰을 때 0이라면 release를 진행한다.
 		// 다른 곳에서 IOCount가 감소하고, 아직 ReleaseSession을 호출하기 전일 수 있으니까.
-		if (InterlockedDecrement64(&findSession->IOBlock->IOCount) == 0)
+		if (InterlockedDecrement64(&findSession->ioBlock->ioCount) == 0)
 		{
 			ReleaseSession(findSession);
 		}
@@ -594,7 +593,7 @@ Session* CoreNetwork::FindSession(__int64 sessionId)
 
 void CoreNetwork::ReturnSession(Session* session)
 {
-	if (InterlockedDecrement64(&session->IOBlock->IOCount) == 0)
+	if (InterlockedDecrement64(&session->ioBlock->ioCount) == 0)
 	{
 		ReleaseSession(session);
 	}
