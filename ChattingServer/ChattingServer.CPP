@@ -22,10 +22,9 @@ void ChattingServer::PacketProcReqChat(__int64 sessionId, Packet* packet)
 
 	short packetType = (short)en_CHATTING_SERVER_PACKET_S2C_CHAT;
 	
-	Packet* s2cChatPacket = MakePacketProcResChat(chatMessage);
-
 	for (auto session : _sessions)
 	{
+		Packet* s2cChatPacket = MakePacketProcResChat(chatMessage);
 		SendPacket(session->sessionId, s2cChatPacket);
 	}
 }
