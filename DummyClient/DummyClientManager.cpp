@@ -61,6 +61,8 @@ void DummyClientManager::CreateWorkerThread(void)
 			_hWorkerThreads.push_back(hThread);
 		}
 	}		
+
+	_hSendThread = (HANDLE)_beginthreadex(NULL, 0, DummySendThreadProc, this, 0, nullptr);
 }
 
 unsigned __stdcall DummyClientManager::DummyWorkerThreadProc(void* argument)
@@ -101,5 +103,24 @@ unsigned __stdcall DummyClientManager::DummyWorkerThreadProc(void* argument)
 
 unsigned __stdcall DummyClientManager::DummySendThreadProc(void* argument)
 {
+	DummyClientManager* instance = (DummyClientManager*)argument;
+	if (instance != nullptr)
+	{
+		while (instance->_running)
+		{
+			for (auto client : instance->_clients)
+			{
+				if (client->_connected)
+				{
+					client->SendRandomMessage();
+
+					instance->_sendPacketTPS++;
+				}
+			}
+
+			Sleep(10);
+		}		
+	}
+
 	return 0;
 }

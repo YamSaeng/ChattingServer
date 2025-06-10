@@ -7,10 +7,7 @@ class DummyClientManager
 {
 public:
 	DummyClientManager();
-	~DummyClientManager();
-
-	void Start(int clientCount, const wchar_t* ip, int port);
-	void Stop(void);
+	~DummyClientManager();	
 private:
 	void CreateWorkerThread(void);
 
@@ -25,4 +22,9 @@ private:
 
 	vector<DummyClient*> _clients;
 	vector<HANDLE> _hWorkerThreads;	
+public:
+	void Start(int clientCount, const wchar_t* ip, int port);
+	void Stop(void);
+	
+	LONG _sendPacketTPS;
 };
