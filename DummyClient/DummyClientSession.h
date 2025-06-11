@@ -5,6 +5,12 @@
 
 #pragma comment(lib, "..\\x64\\Debug\\NetworkLib.lib")
 
+struct IOBlock
+{
+	LONG64 ioCount = 0;
+	LONG64 isRelease = false;
+};
+
 struct DummyClientSession
 {
 	LONG dummyClientSessionId = 0;
@@ -16,5 +22,7 @@ struct DummyClientSession
 	Packet* sendPacket = nullptr;	
 
 	OVERLAPPED recvOverlapped = {};
-	OVERLAPPED sendOverlapped = {};	
+	OVERLAPPED sendOverlapped = {};		
+
+	IOBlock* ioBlock = nullptr;
 };
