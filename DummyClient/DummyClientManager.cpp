@@ -38,7 +38,7 @@ void DummyClientManager::Start(int clientCount, const wchar_t* ip, int port)
 		DummyClient* dummyClient = new DummyClient();
 		dummyClient->Connect(ip, port, i, _hIOCP);
 		_clients.push_back(dummyClient);
-	}		
+	}
 }
 
 void DummyClientManager::Stop(void)
@@ -52,7 +52,7 @@ void DummyClientManager::CreateWorkerThread(void)
 	SYSTEM_INFO systemInfo;
 	GetSystemInfo(&systemInfo);
 	_workerThreadCount = systemInfo.dwNumberOfProcessors * 2;
-	
+
 	for (int i = 0; i < _workerThreadCount; i++)
 	{
 		HANDLE hThread = (HANDLE)_beginthreadex(NULL, 0, DummyWorkerThreadProc, this, 0, nullptr);
@@ -60,14 +60,14 @@ void DummyClientManager::CreateWorkerThread(void)
 		{
 			_hWorkerThreads.push_back(hThread);
 		}
-	}		
+	}
 
 	_hSendThread = (HANDLE)_beginthreadex(NULL, 0, DummySendThreadProc, this, 0, nullptr);
 }
 
 unsigned __stdcall DummyClientManager::DummyWorkerThreadProc(void* argument)
 {
-	DummyClientManager* instance = (DummyClientManager*)argument;	
+	DummyClientManager* instance = (DummyClientManager*)argument;
 
 	if (instance != nullptr)
 	{
@@ -77,23 +77,36 @@ unsigned __stdcall DummyClientManager::DummyWorkerThreadProc(void* argument)
 			DWORD transferred = 0;
 			OVERLAPPED* completeOverlapped = nullptr;
 
-			bool result = GetQueuedCompletionStatus(instance->_hIOCP,
-				&transferred, (PULONG_PTR)&completeDummyClient, (LPOVERLAPPED*)&completeOverlapped, INFINITE);
+			do
+			{
+				bool result = GetQueuedCompletionStatus(instance->_hIOCP,
+					&transferred, (PULONG_PTR)&completeDummyClient, (LPOVERLAPPED*)&completeOverlapped, INFINITE);
 
-			if (completeOverlapped == nullptr)
-			{
-				DWORD GQCSError = WSAGetLastError();
-				cout << "completeOverlapped NULL: " << GQCSError << endl;
-				return -1;
-			}
+				if (completeOverlapped == nullptr)
+				{
+					DWORD GQCSError = WSAGetLastError();
+					cout << "completeOverlapped NULL: " << GQCSError << endl;
+					return -1;
+				}
 
-			if (completeOverlapped == &completeDummyClient->_dummyClientSession->recvOverlapped)
+				if (transferred == 0)
+				{
+					break;
+				}
+
+				if (completeOverlapped == &completeDummyClient->_dummyClientSession->recvOverlapped)
+				{
+					completeDummyClient->RecvComplete(transferred);
+				}
+				else if (completeOverlapped == &completeDummyClient->_dummyClientSession->sendOverlapped)
+				{
+					completeDummyClient->SendComplete();
+				}
+			} while (0);
+
+			if (InterlockedDecrement64(&completeDummyClient->_dummyClientSession->ioBlock->ioCount) == 0)
 			{
-				completeDummyClient->RecvComplete(transferred);
-			}			
-			else if (completeOverlapped == &completeDummyClient->_dummyClientSession->sendOverlapped)
-			{
-				completeDummyClient->SendComplete();
+				completeDummyClient->ReleaseDummyClient();
 			}
 		}
 	}
@@ -106,20 +119,26 @@ unsigned __stdcall DummyClientManager::DummySendThreadProc(void* argument)
 	DummyClientManager* instance = (DummyClientManager*)argument;
 	if (instance != nullptr)
 	{
+		srand((unsigned int)time(NULL));
+
 		while (instance->_running)
 		{
 			for (auto client : instance->_clients)
 			{
 				if (client->_connected)
 				{
-					client->SendRandomMessage();
+					int randomValue = rand() % 100;
 
-					instance->_sendPacketTPS++;
+					if (randomValue < 95)
+					{
+						client->SendRandomMessage();
+						instance->_sendPacketTPS++;
+					}					
 				}
 			}
 
-			Sleep(10);
-		}		
+			Sleep(100);
+		}
 	}
 
 	return 0;
