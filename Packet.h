@@ -1,4 +1,5 @@
 #pragma once
+#include"ObjectPool.h"
 
 #ifdef PACKET
 #define PACKET_DLL __declspec(dllexport)
@@ -41,6 +42,10 @@ public:
 	Packet();
 	~Packet();
 
+	static ObjectPool<Packet> _objectPool; // ObjectPool을 사용하여 Packet을 할당
+	LONG* _retCount; // Packet이 사용되고 있는지 확인하기 위한 카운트
+	bool _isEncode;  // Packet이 한번만 인코딩되도록 하기 위한 플래그
+
 	void Clear(void);
 
 	unsigned int GetBufferSize(void);
@@ -74,6 +79,13 @@ public:
 
 	// 헤더 설정
 	void SetHeader(char* header, char size);
+
+	// Packet을 할당
+	static Packet* Alloc(); 
+	// Packet을 반납
+	void Free();
+	// Packet 참조 횟수 증가
+	void AddRetCount();
 
 	// 패킷 인코딩
 	bool Encode(void);
