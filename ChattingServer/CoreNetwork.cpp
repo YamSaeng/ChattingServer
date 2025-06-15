@@ -147,9 +147,10 @@ void CoreNetwork::SendPacket(__int64 sessionId, Packet* packet)
 	}
 
 	packet->Encode();
+	packet->AddRetCount();
 
 	// 패킷 큐잉
-	sendSession->sendQueue.Push(packet);
+	sendSession->sendQueue.Push(packet);	
 
 	// WSASend 등록
 	SendPost(sendSession);
@@ -459,14 +460,7 @@ void CoreNetwork::ReleaseSession(Session* releaseSession)
 	// 이 부분에서 sendQueue의 크기를 확인해서 내용이 남아있으면 해제한다.
 	while (releaseSession->sendQueue.Size() > 0)
 	{
-		Packet* deletePacket = releaseSession->sendQueue.Pop();
-		
-		if (deletePacket == nullptr)
-		{
-			continue;
-		}
-
-		delete deletePacket;
+		releaseSession->sendQueue.Clear();		
 	}
 
 	closesocket(releaseSession->clientSocket);
@@ -482,7 +476,7 @@ void CoreNetwork::RecvComplete(Session* recvCompleteSesion, const DWORD& transfe
 	recvCompleteSesion->recvRingBuffer.MoveRear(transferred);
 
 	Packet::EncodeHeader encodeHeader;
-	Packet* packet = new Packet();
+	Packet* packet = Packet::Alloc();
 
 	while (loopCount++ < MAX_PACKET_LOOP)
 	{
@@ -537,7 +531,7 @@ void CoreNetwork::RecvComplete(Session* recvCompleteSesion, const DWORD& transfe
 		OnRecv(recvCompleteSesion->sessionId, packet);
 	}
 	
-	delete packet;
+	packet->Free();
 
 	RecvPost(recvCompleteSesion);
 }

@@ -51,7 +51,7 @@ private:
 
 	// WSASend 완료시 호출하는 함수
 	void SendComplete(Session* sendCompleteSession);
-protected:
+protected:	
 	// 서버에서 관리할 session 배열
 	vector<Session*> _sessions;
 
