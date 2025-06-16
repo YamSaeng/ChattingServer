@@ -24,14 +24,17 @@ void ChattingServer::PacketProcReqChat(__int64 sessionId, Packet* packet)
 		
 	for (auto session : _sessions)
 	{
-		Packet* s2cChatPacket = MakePacketProcResChat(chatMessage);
-		if (s2cChatPacket == nullptr)
+		if (session->clientSocket != INVALID_SOCKET)
 		{
-			continue;
-		}
+			Packet* s2cChatPacket = MakePacketProcResChat(chatMessage);
+			if (s2cChatPacket == nullptr)
+			{
+				continue;
+			}
 
-		SendPacket(session->sessionId, s2cChatPacket);
-		s2cChatPacket->Free();
+			SendPacket(session->sessionId, s2cChatPacket);
+			s2cChatPacket->Free();
+		}		
 	}
 }
 

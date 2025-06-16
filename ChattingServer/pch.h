@@ -20,6 +20,10 @@
 
 #include<sysinfoapi.h>
 
+#include<fstream>
+#include<sstream>
+#include<string>
+
 #include <io.h>
 #include <fcntl.h>
 

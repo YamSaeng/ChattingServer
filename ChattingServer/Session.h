@@ -6,6 +6,8 @@
 
 #pragma comment(lib, "..\\x64\\Debug\\NetworkLib.lib")
 
+#define SESSION_SEND_PACKET_MAX 2000
+
 struct IOBlock
 {
 	// IO 작업 횟수를 기록해둘 변수 
@@ -33,6 +35,6 @@ struct Session
 	
 	LONG isSend; // 세션에 대해 WSASend 작업을 하고 있는지 안하고 있는지 여부
 
-	SendQueue sendPacket; // 전송할 패킷들을 담아둠
+	Packet* sendPacket[SESSION_SEND_PACKET_MAX]; // session이 보내는 패킷을 담아둘 배열
 	LONG sendPacketCount; // 전송한 패킷의 개수를 기록
 };

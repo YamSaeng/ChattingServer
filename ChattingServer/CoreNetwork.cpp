@@ -16,6 +16,18 @@ CoreNetwork::CoreNetwork()
 	
 	_recvPacketTPS = 0;
 	_sendPacketTPS = 0;
+
+	for (int sessionCount = SERVER_SESSION_MAX - 1; sessionCount >= 0; sessionCount--)
+	{
+		_sessions[sessionCount] = new Session();
+		_sessions[sessionCount]->ioBlock = (IOBlock*)_aligned_malloc(sizeof(IOBlock), 16);
+		memset(&_sessions[sessionCount]->sendPacket, 0, sizeof(Packet*) * SESSION_SEND_PACKET_MAX);
+		_sessions[sessionCount]->clientSocket = INVALID_SOCKET;
+		_sessions[sessionCount]->ioBlock->ioCount = 0;
+		_sessions[sessionCount]->ioBlock->IsRelease = 0;
+
+		_sessionIndexs.Push(sessionCount);
+	}	
 }
 
 CoreNetwork::~CoreNetwork()
@@ -88,16 +100,7 @@ bool CoreNetwork::Start(const WCHAR* openIP, int port)
 
 void CoreNetwork::Stop()
 {
-	wcout << L"채팅 서버 종료" << endl;
-	
-	// session 연결 종료
-	for (Session* session : _sessions)
-	{
-		if (session != nullptr)
-		{
-			Disconnect(session->sessionId);
-		}
-	}
+	wcout << L"채팅 서버 종료" << endl;	
 
 	// listen 소켓 닫기
 	closesocket(_listenSocket);
@@ -110,10 +113,7 @@ void CoreNetwork::Stop()
 		closesocket(session->clientSocket);
 		delete session->ioBlock;
 		delete session;
-	}
-
-	// session 배열 비우기
-	_sessions.clear();
+	}	
 
 	// accept 스레드 종료
 	CloseHandle(_hAcceptThread);
@@ -182,7 +182,7 @@ void CoreNetwork::Disconnect(__int64 sessionId)
 
 int CoreNetwork::SessionCount()
 {
-	return (int)_sessions.size();
+	return 0;
 }
 
 unsigned __stdcall CoreNetwork::AcceptThreadProc(void* argument)
@@ -209,14 +209,22 @@ unsigned __stdcall CoreNetwork::AcceptThreadProc(void* argument)
 			instance->_acceptTotal++;
 			instance->_acceptTPS++;
 
-			// 세션 할당
-			Session* newSession = new Session();			
+			CHAR clientIp[16] = { 0 };
+			CHAR clientInfo[50] = { 0 };
+			InetNtopA(AF_INET, &clientAddr.sin_addr, clientIp, 16);			
+			cout << "Connect Client IP : " << clientIp << " Port : " << ntohs(clientAddr.sin_port) << endl;
 
-			newSession->sessionId = instance->_sessionId++;
+			// 세션 할당
+			Session* newSession;
+			int newSessionIndex;
+
+			instance->_sessionIndexs.Pop(&newSessionIndex);
+			newSession = instance->_sessions[newSessionIndex];
+
+			newSession->sessionId = MAKE_SESSION_ID(instance->_sessionId, newSessionIndex);
 			newSession->clientAddr = clientAddr;
 			newSession->clientSocket = clientSock;
-
-			newSession->ioBlock = new IOBlock();			
+			newSession->isSend = 0;
 
 			// IOCP에 등록
 			CreateIoCompletionPort((HANDLE)newSession->clientSocket, instance->_HCP, (ULONG_PTR)newSession, 0);
@@ -224,11 +232,10 @@ unsigned __stdcall CoreNetwork::AcceptThreadProc(void* argument)
 			newSession->ioBlock->ioCount++;
 			newSession->ioBlock->IsRelease = 0;
 
-			instance->OnClientJoin(newSession);
-			instance->RecvPost(newSession, true);
+			instance->_sessionId++;
 
-			// sessions에 저장
-			instance->_sessions.push_back(newSession);
+			instance->OnClientJoin(newSession);
+			instance->RecvPost(newSession, true);			
 		}
 	}
 
@@ -346,7 +353,7 @@ void CoreNetwork::SendPost(Session* sendSession)
 {
 	int sendUseSize;
 	int sendCount = 0;
-	WSABUF sendBuf[500];
+	WSABUF sendBuf[SESSION_SEND_PACKET_MAX];
 
 	do
 	{
@@ -401,6 +408,8 @@ void CoreNetwork::SendPost(Session* sendSession)
 		}
 	} while (0);	
 
+	sendSession->sendPacketCount = sendUseSize;
+
 	// 보내야할 패킷의 개수만큼 sendQueue에서 패킷을 꺼내서 WSABUF에 넣는다.
 	for (int i = 0; i < sendUseSize; i++)
 	{
@@ -416,7 +425,7 @@ void CoreNetwork::SendPost(Session* sendSession)
 		sendBuf[i].buf = packet->GetHeaderBufferPtr();
 		sendBuf[i].len = packet->GetUseBufferSize();
 
-		sendSession->sendPacket.Push(packet);		
+		sendSession->sendPacket[i] = packet;			
 	}
 
 	// WSAsend를 걸기 전에 한번 청소해준다.
@@ -466,7 +475,7 @@ void CoreNetwork::ReleaseSession(Session* releaseSession)
 	closesocket(releaseSession->clientSocket);
 	delete releaseSession->ioBlock;
 
-	_sessions.erase(remove_if(_sessions.begin(), _sessions.end(), [releaseSession](Session* eraseSession) {return eraseSession->sessionId == releaseSession->sessionId; }), _sessions.end());
+	_sessionIndexs.Push(GET_SESSION_INDEX(releaseSession->sessionId));		
 }
 
 void CoreNetwork::RecvComplete(Session* recvCompleteSesion, const DWORD& transferred)
@@ -538,7 +547,12 @@ void CoreNetwork::RecvComplete(Session* recvCompleteSesion, const DWORD& transfe
 
 void CoreNetwork::SendComplete(Session* sendCompleteSession)
 {
-	sendCompleteSession->sendPacket.Clear();	
+	for (int i = 0; i < sendCompleteSession->sendPacketCount; i++)
+	{
+		sendCompleteSession->sendPacket[i]->Free();
+	}
+
+	sendCompleteSession->sendPacketCount = 0;	
 
 	// isSend를 0 으로 바꿔서 WSASend를 걸수 있도록 해준다.
 	InterlockedExchange(&sendCompleteSession->isSend, 0);
@@ -555,34 +569,27 @@ Session* CoreNetwork::FindSession(__int64 sessionId)
 {
 	int sessionIndex = GET_SESSION_INDEX(sessionId);
 
-	Session* findSession = _sessions[sessionIndex];
-	if (findSession == nullptr)
+	if (_sessions[sessionIndex]->ioBlock->IsRelease == 1)
 	{
 		return nullptr;
-	}
-
-	// 만약 session이 release 작업 예정이라면 나간다.
-	if (findSession->ioBlock->IsRelease == 1)
-	{
-		return nullptr;
-	}	
+	}		
 
 	// IOCount를 1 증가시켰을 때 그 값이 1인지 확인한다.
 	// 1 이라면 해당 session이 release 중이거나 예정임을 알 수 있다.
-	if (InterlockedIncrement64(&findSession->ioBlock->ioCount) == 1)
+	if (InterlockedIncrement64(&_sessions[sessionIndex]->ioBlock->ioCount) == 1)
 	{
 		// 여기서 IOCount를 1 감소시켰을 때 0이라면 release를 진행한다.
 		// 다른 곳에서 IOCount가 감소하고, 아직 ReleaseSession을 호출하기 전일 수 있으니까.
-		if (InterlockedDecrement64(&findSession->ioBlock->ioCount) == 0)
+		if (InterlockedDecrement64(&_sessions[sessionIndex]->ioBlock->ioCount) == 0)
 		{
-			ReleaseSession(findSession);
+			ReleaseSession(_sessions[sessionIndex]);
 		}
 
 		// 아니라면 nullptr을 반환해 release 대상임을 알려준다.
 		return nullptr;
 	}
 
-	return findSession;
+	return _sessions[sessionIndex];
 }
 
 void CoreNetwork::ReturnSession(Session* session)

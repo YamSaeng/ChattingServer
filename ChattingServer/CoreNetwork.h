@@ -2,6 +2,7 @@
 #pragma comment(lib,"ws2_32")
 
 #include"Session.h"
+#include"../LockfreeStack.h"
 
 // 상위 16비트에 SessionId를 기록하고 하위 16비트에 Session이 위치해 있는 Index를 기록한다.
 #define MAKE_SESSION_ID(SESSION_ID, INDEX) (((uint32_t)(SESSION_ID) << 16) | ((uint32_t)(INDEX) & 0xFFFF))
@@ -10,12 +11,14 @@
 // 하위 16비트에서 SessionIndex를 가져옴
 #define GET_SESSION_INDEX(SESSION_UID)     ((uint16_t)(SESSION_UID & 0xFFFF))
 
+#define SERVER_SESSION_MAX 5000
+
 class CoreNetwork
 {
 public:
 	CoreNetwork();
 	virtual ~CoreNetwork();
-private:
+private:	
 	// IOCP 핸들 
 	HANDLE _HCP;
 
@@ -53,7 +56,8 @@ private:
 	void SendComplete(Session* sendCompleteSession);
 protected:	
 	// 서버에서 관리할 session 배열
-	vector<Session*> _sessions;
+	Session* _sessions[SERVER_SESSION_MAX];
+	LockfreeStack<int> _sessionIndexs;		
 
 	// accept 호출 후 접속한 클라를 대상으로 호출하는 함수
 	virtual void OnClientJoin(Session* newSession) = 0;
