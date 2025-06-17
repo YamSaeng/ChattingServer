@@ -107,12 +107,11 @@ void CoreNetwork::Stop()
 	
 	WSACleanup();
 	
-	// session 할당 해제
+	// session 닫기
 	for (Session* session : _sessions)
 	{
 		closesocket(session->clientSocket);
-		delete session->ioBlock;
-		delete session;
+		session->clientSocket = INVALID_SOCKET;
 	}	
 
 	// accept 스레드 종료
@@ -191,7 +190,7 @@ unsigned __stdcall CoreNetwork::AcceptThreadProc(void* argument)
 
 	if (instance != nullptr)
 	{
-		for (;;)
+		while(1)
 		{
 			SOCKADDR_IN clientAddr;
 			int addrLen = sizeof(clientAddr);
@@ -211,7 +210,8 @@ unsigned __stdcall CoreNetwork::AcceptThreadProc(void* argument)
 
 			CHAR clientIp[16] = { 0 };
 			CHAR clientInfo[50] = { 0 };
-			InetNtopA(AF_INET, &clientAddr.sin_addr, clientIp, 16);			
+			InetNtopA(AF_INET, &clientAddr.sin_addr, clientIp, 16);					
+
 			cout << "Connect Client IP : " << clientIp << " Port : " << ntohs(clientAddr.sin_port) << endl;
 
 			// 세션 할당
@@ -472,8 +472,7 @@ void CoreNetwork::ReleaseSession(Session* releaseSession)
 		releaseSession->sendQueue.Clear();		
 	}
 
-	closesocket(releaseSession->clientSocket);
-	delete releaseSession->ioBlock;
+	closesocket(releaseSession->clientSocket);	
 
 	_sessionIndexs.Push(GET_SESSION_INDEX(releaseSession->sessionId));		
 }
