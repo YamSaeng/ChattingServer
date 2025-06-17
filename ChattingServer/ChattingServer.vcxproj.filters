@@ -27,9 +27,6 @@
     <ClCompile Include="pch.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="IPFilter.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CoreNetwork.h">
@@ -47,7 +44,7 @@
     <ClInclude Include="ChattingServer.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="IPFilter.h">
+    <ClInclude Include="IPCountryChecker.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>
@@ -55,5 +52,6 @@
     <None Include="ServerInfo.json">
       <Filter>리소스 파일</Filter>
     </None>
+    <None Include="packages.config" />
   </ItemGroup>
 </Project>
