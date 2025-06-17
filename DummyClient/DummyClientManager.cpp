@@ -137,7 +137,7 @@ unsigned __stdcall DummyClientManager::DummySendThreadProc(void* argument)
 				}
 			}
 
-			Sleep(100);
+			Sleep(500);
 		}
 	}
 

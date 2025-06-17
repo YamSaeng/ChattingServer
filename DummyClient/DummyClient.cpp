@@ -159,10 +159,16 @@ void DummyClient::ReleaseDummyClient()
 	closesocket(_dummyClientSession->clientSocket);
 	_dummyClientSession->clientSocket = INVALID_SOCKET;
 
+	if (_dummyClientSession && _dummyClientSession->sendPacket != nullptr)
+	{
+		_dummyClientSession->sendPacket->Free();
+		_dummyClientSession->sendPacket = nullptr;
+	}
+
 	delete _dummyClientSession->ioBlock;
 	_dummyClientSession->ioBlock = nullptr;
 	delete _dummyClientSession;	
-	_dummyClientSession = nullptr;
+	_dummyClientSession = nullptr;	
 }
 
 void DummyClient::SendRandomMessage(void)
@@ -181,19 +187,22 @@ void DummyClient::SendRandomMessage(void)
 
 	const char* samples[] = {
 	"Hello", "Stress Test","Test Send", "Jung", "Bye"};
-	string msg = samples[rand() % (sizeof(samples) / sizeof(char*))];
+	string msg = samples[rand() % (sizeof(samples) / sizeof(char*))];	
 		
-	Packet* c2sChatPacket = new Packet();	
+	Packet* c2sChatPacket = Packet::Alloc();
+	c2sChatPacket->Clear();
+
 	short packetType = (short)en_CHATTING_SERVER_PACKET_C2S_CHAT;	
 	*c2sChatPacket << packetType;
 	*c2sChatPacket << make_pair(msg.c_str(), (int)msg.length());
 
-	c2sChatPacket->Encode();
+	c2sChatPacket->Encode();	
+	c2sChatPacket->AddRetCount();
 
 	sendWsabuf.buf = c2sChatPacket->GetHeaderBufferPtr();
-	sendWsabuf.len = c2sChatPacket->GetUseBufferSize();
+	sendWsabuf.len = c2sChatPacket->GetUseBufferSize();	
 
-	_dummyClientSession->sendPacket = c2sChatPacket;
+	_dummyClientSession->sendPacket = c2sChatPacket;	
 
 	memset(&_dummyClientSession->sendOverlapped, 0, sizeof(OVERLAPPED));
 
@@ -209,7 +218,9 @@ void DummyClient::SendRandomMessage(void)
 			cout << "DummyClient [" << _id << "] WSASend fail" << error << endl;
 			Disconnect();
 		}
-	}
+	}	
+
+	c2sChatPacket->Free();
 }
 
 void DummyClient::RecvPost(bool isConnectRecvPost)
@@ -278,7 +289,7 @@ void DummyClient::RecvComplete(DWORD transferred)
 	const int MAX_PACKET_LOOP = 64;
 	
 	Packet::EncodeHeader encodeHeader;
-	Packet* packet = new Packet();
+	Packet* packet = Packet::Alloc();
 
 	while (loopCount++ < MAX_PACKET_LOOP)
 	{
@@ -322,7 +333,8 @@ void DummyClient::RecvComplete(DWORD transferred)
 		//cout << "[Dummy " << _id << "] Received: " << chatMessage.c_str() << endl;
 	}		
 	
-	delete packet;	
+	packet->Free();
+
 	RecvPost(false);
 }
 
@@ -330,7 +342,7 @@ void DummyClient::SendComplete(void)
 {
 	if (_dummyClientSession->sendPacket != nullptr)
 	{
-		delete _dummyClientSession->sendPacket;
+		_dummyClientSession->sendPacket->Free();	
 		_dummyClientSession->sendPacket = nullptr;
 	}
 	

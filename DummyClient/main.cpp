@@ -21,11 +21,19 @@ int main()
 		switch (dummyClientMenuSelectNum)
 		{
 		case 1:
+			if (dummyClientCount > 0)
+			{
+				cout << "더미 생성 완료 2번을 입력해 서버 접속 시작" << endl << endl;
+				continue;
+			}
+
 			cout << "생성할 더미 개수 입력 : ";
 			cin >> dummyClientCount;			
 			isDummyCountSet = true;
 
 			cout << endl;
+
+			system("cls");
 			break;
 		case 2:
 			if (isDummyCountSet == false)
