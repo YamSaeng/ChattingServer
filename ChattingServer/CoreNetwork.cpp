@@ -36,6 +36,8 @@ CoreNetwork::~CoreNetwork()
 
 bool CoreNetwork::Start(const WCHAR* openIP, int port)
 {
+	_ipCountryChecker.Start();
+
 	wcout << L"채팅 서버 시작" << endl;
 
 	WSADATA wsaData;
@@ -211,8 +213,17 @@ unsigned __stdcall CoreNetwork::AcceptThreadProc(void* argument)
 			CHAR clientIp[16] = { 0 };
 			CHAR clientInfo[50] = { 0 };
 			InetNtopA(AF_INET, &clientAddr.sin_addr, clientIp, 16);					
+					
+			string nationCode = instance->_ipCountryChecker.IPCheck(clientIp);
 
-			cout << "Connect Client IP : " << clientIp << " Port : " << ntohs(clientAddr.sin_port) << endl;
+			//cout << "NationCode : " << nationCode << " Connect Client IP : " << clientIp << " Port : " << ntohs(clientAddr.sin_port) << endl;
+
+			if (nationCode != "LOOPBACK" && nationCode != "KR")
+			{
+				cout << "Code [" << nationCode << "] close IP: " << clientIp << endl;
+				closesocket(clientSock);
+				continue;
+			}
 
 			// 세션 할당
 			Session* newSession;

@@ -495,66 +495,7 @@ private:
 		}
 
 		return loaded;
-	}
-
-	/**
-	 * 주요 기능: IP 주소의 국가 코드를 반환
-	 * @param ip IP 주소 문자열 (예: "8.8.8.8")
-	 * @return 국가 코드 ("KR", "US", "JP" 등) 또는 "INVALID"/"UNKNOWN"
-	 */
-	string IPCheck(const string& ip) const
-	{
-		unsigned int ipInt = IPToInt(ip);
-		if (ipInt == 0) return "INVALID"; // 잘못된 IP 형식
-
-		return IPCheck(ipInt);
-	}
-
-	/**
-	 * 주요 기능: IP 주소(정수형)의 국가 코드를 반환
-	 * 이진 검색을 사용하여 빠른 조회 성능 제공
-	 * @param ipInt IP 주소 (32비트 정수)
-	 * @return 국가 코드 ("KR", "US", "JP" 등) 또는 "INVALID"/"UNKNOWN"
-	 */
-	string IPCheck(unsigned int ipInt) const
-	{
-		if (ipInt == 0) return "INVALID";
-
-		// 이진 검색으로 해당 IP를 포함하는 범위 찾기
-		auto it = lower_bound(_ranges.begin(), _ranges.end(), ipInt,
-			[](const IPRange& range, unsigned int ip)
-			{
-				return range.end < ip; // 범위의 끝이 IP보다 작으면 true
-			});
-
-		// 찾은 범위가 실제로 IP를 포함하는지 확인
-		if (it != _ranges.end() && it->contains(ipInt))
-		{
-			return it->countryCode;
-		}
-
-		return "UNKNOWN"; // 해당하는 범위를 찾지 못함
-	}
-
-	/**
-	 * 한국 IP 확인 (기존 코드와의 호환성 유지)
-	 * @param ip IP 주소 문자열
-	 * @return 한국 IP이면 true, 아니면 false
-	 */
-	bool IsKoreanIP(const string& ip) const
-	{
-		return IPCheck(ip) == "KR";
-	}
-
-	/**
-	 * 한국 IP 확인 (정수형 IP용)
-	 * @param ipInt IP 주소 (32비트 정수)
-	 * @return 한국 IP이면 true, 아니면 false
-	 */
-	bool IsKoreanIP(unsigned int ipInt) const
-	{
-		return IPCheck(ipInt) == "KR";
-	}
+	}	
 
 	/**
 	 * 클라이언트 처리 (접속한 클라이언트의 국가에 따른 처리)
@@ -729,6 +670,71 @@ private:
 			}).detach();  // 스레드를 분리하여 백그라운드에서 실행
 	}
 public:
+
+	/**
+	 * 주요 기능: IP 주소의 국가 코드를 반환
+	 * @param ip IP 주소 문자열 (예: "8.8.8.8")
+	 * @return 국가 코드 ("KR", "US", "JP" 등) 또는 "INVALID"/"UNKNOWN"
+	 */
+	string IPCheck(const string& ip) const
+	{
+		if (ip == "127.0.0.1")
+		{
+			return "LOOPBACK";
+		}
+
+		unsigned int ipInt = IPToInt(ip);
+		if (ipInt == 0) return "INVALID"; // 잘못된 IP 형식
+
+		return IPCheck(ipInt);
+	}
+
+	/**
+	 * 주요 기능: IP 주소(정수형)의 국가 코드를 반환
+	 * 이진 검색을 사용하여 빠른 조회 성능 제공
+	 * @param ipInt IP 주소 (32비트 정수)
+	 * @return 국가 코드 ("KR", "US", "JP" 등) 또는 "INVALID"/"UNKNOWN"
+	 */
+	string IPCheck(unsigned int ipInt) const
+	{
+		if (ipInt == 0) return "INVALID";
+
+		// 이진 검색으로 해당 IP를 포함하는 범위 찾기
+		auto it = lower_bound(_ranges.begin(), _ranges.end(), ipInt,
+			[](const IPRange& range, unsigned int ip)
+			{
+				return range.end < ip; // 범위의 끝이 IP보다 작으면 true
+			});
+
+		// 찾은 범위가 실제로 IP를 포함하는지 확인
+		if (it != _ranges.end() && it->contains(ipInt))
+		{
+			return it->countryCode;
+		}
+
+		return "UNKNOWN"; // 해당하는 범위를 찾지 못함
+	}
+
+	/**
+	 * 한국 IP 확인 (기존 코드와의 호환성 유지)
+	 * @param ip IP 주소 문자열
+	 * @return 한국 IP이면 true, 아니면 false
+	 */
+	bool IsKoreanIP(const string& ip) const
+	{
+		return IPCheck(ip) == "KR";
+	}
+
+	/**
+	 * 한국 IP 확인 (정수형 IP용)
+	 * @param ipInt IP 주소 (32비트 정수)
+	 * @return 한국 IP이면 true, 아니면 false
+	 */
+	bool IsKoreanIP(unsigned int ipInt) const
+	{
+		return IPCheck(ipInt) == "KR";
+	}
+
 	/**
 	 * 캐시 상태 정보 출력
 	 */

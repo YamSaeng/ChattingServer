@@ -4,6 +4,8 @@
 #include"Session.h"
 #include"../LockfreeStack.h"
 
+#include"IPCountryChecker.h"
+
 // 상위 16비트에 SessionId를 기록하고 하위 16비트에 Session이 위치해 있는 Index를 기록한다.
 #define MAKE_SESSION_ID(SESSION_ID, INDEX) (((uint32_t)(SESSION_ID) << 16) | ((uint32_t)(INDEX) & 0xFFFF))
 // 상위 16비트에서 SessionId를 가져옴
@@ -19,6 +21,8 @@ public:
 	CoreNetwork();
 	virtual ~CoreNetwork();
 private:	
+	IPCountryChecker _ipCountryChecker;
+
 	// IOCP 핸들 
 	HANDLE _HCP;
 
