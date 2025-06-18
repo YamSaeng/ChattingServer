@@ -12,7 +12,7 @@ DummyClientManager::~DummyClientManager()
 	WSACleanup();
 }
 
-void DummyClientManager::Start(int clientCount, const wchar_t* ip, int port)
+void DummyClientManager::Start(int clientCount, bool isDisconnect, bool isReconnectTry, char probilityDisconnect, const wchar_t* ip, int port)
 {
 	WSADATA wsaData;
 	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
@@ -27,13 +27,18 @@ void DummyClientManager::Start(int clientCount, const wchar_t* ip, int port)
 
 	_running = true;
 
+	_clientCount = clientCount;
+	_isDisconnect = isDisconnect;
+	_isReconnectTry = isReconnectTry;
+	_probilityDisconnect = probilityDisconnect;
+
 	// 워커쓰레드 생성
 	CreateWorkerThread();
 
 	Sleep(1000);
 
 	// 1초 기다렸다가 더미 클라 생성하면서 서버 접속하고 저장
-	for (int i = 0; i < clientCount; i++)
+	for (int i = 0; i < _clientCount; i++)
 	{
 		DummyClient* dummyClient = new DummyClient();
 		dummyClient->Connect(ip, port, i, _hIOCP);
@@ -116,6 +121,8 @@ unsigned __stdcall DummyClientManager::DummyWorkerThreadProc(void* argument)
 
 unsigned __stdcall DummyClientManager::DummySendThreadProc(void* argument)
 {
+	Sleep(2000);
+
 	DummyClientManager* instance = (DummyClientManager*)argument;
 	if (instance != nullptr)
 	{
@@ -129,11 +136,22 @@ unsigned __stdcall DummyClientManager::DummySendThreadProc(void* argument)
 				{
 					int randomValue = rand() % 100;
 
-					if (randomValue < 95)
+					if (randomValue < 100 - instance->_probilityDisconnect)
 					{
 						client->SendRandomMessage();
 						instance->_sendPacketTPS++;
-					}					
+					}
+					else
+					{
+						client->Disconnect();
+					}
+				}
+				else
+				{
+					if (instance->_isReconnectTry && client->ReconnectTimeCheck())
+					{
+						client->ReconnectTry();
+					}
 				}
 			}
 
