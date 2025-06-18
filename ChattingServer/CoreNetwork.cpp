@@ -183,7 +183,7 @@ void CoreNetwork::Disconnect(__int64 sessionId)
 
 int CoreNetwork::SessionCount()
 {
-	return 0;
+	return _sessionCount;
 }
 
 unsigned __stdcall CoreNetwork::AcceptThreadProc(void* argument)
@@ -224,6 +224,8 @@ unsigned __stdcall CoreNetwork::AcceptThreadProc(void* argument)
 				closesocket(clientSock);
 				continue;
 			}
+
+			InterlockedIncrement(&instance->_sessionCount);
 
 			// 세션 할당
 			Session* newSession;
@@ -485,6 +487,8 @@ void CoreNetwork::ReleaseSession(Session* releaseSession)
 
 	closesocket(releaseSession->clientSocket);	
 
+	InterlockedDecrement(&_sessionCount);
+
 	_sessionIndexs.Push(GET_SESSION_INDEX(releaseSession->sessionId));		
 }
 
@@ -597,6 +601,11 @@ Session* CoreNetwork::FindSession(__int64 sessionId)
 
 		// 아니라면 nullptr을 반환해 release 대상임을 알려준다.
 		return nullptr;
+	}
+
+	if (sessionId != _sessions[sessionIndex]->sessionId)
+	{
+		CRASH("세션 id가 다름");
 	}
 
 	return _sessions[sessionIndex];

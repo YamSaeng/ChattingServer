@@ -84,6 +84,9 @@ public:
 	// 연결 수락 총 개수
 	int _acceptTotal;
 
+	// session 개수
+	LONG _sessionCount;
+
 	// recvPacet을 1초 동안 받은 횟수
 	LONG _recvPacketTPS;
 	// sendPacket을 1초 동안 보낸 횟수
