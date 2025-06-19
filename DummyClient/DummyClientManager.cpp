@@ -27,7 +27,7 @@ void DummyClientManager::Start(int clientCount, bool isDisconnect, bool isReconn
 
 	_running = true;
 
-	_clientCount = clientCount;
+	_dummyClientCount = clientCount;
 	_isDisconnect = isDisconnect;
 	_isReconnectTry = isReconnectTry;
 	_probilityDisconnect = probilityDisconnect;
@@ -38,7 +38,7 @@ void DummyClientManager::Start(int clientCount, bool isDisconnect, bool isReconn
 	Sleep(1000);
 
 	// 1초 기다렸다가 더미 클라 생성하면서 서버 접속하고 저장
-	for (int i = 0; i < _clientCount; i++)
+	for (int i = 0; i < _dummyClientCount; i++)
 	{
 		DummyClient* dummyClient = new DummyClient();
 		dummyClient->Connect(ip, port, i, _hIOCP);

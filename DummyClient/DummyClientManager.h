@@ -17,7 +17,6 @@ private:
 	HANDLE _hSendThread;
 	HANDLE _hIOCP;
 
-	int _clientCount;
 	bool _isDisconnect;
 	bool _isReconnectTry;
 	int _probilityDisconnect;
@@ -32,4 +31,5 @@ public:
 	void Stop(void);
 
 	LONG _sendPacketTPS;
+	LONG _dummyClientCount;
 };

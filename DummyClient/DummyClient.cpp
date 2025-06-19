@@ -91,7 +91,7 @@ bool DummyClient::ReconnectTimeCheck(void)
 
 	if (_currentReconnectAttempt >= _maxReconnectAttempt)
 	{
-		cout << "DummyClient [" << _id << "] 최대 재접속 시도 횟수 초과" << endl;
+		//cout << "DummyClient [" << _id << "] 최대 재접속 시도 횟수 초과" << endl;
 		return false;
 	}
 
@@ -113,25 +113,25 @@ void DummyClient::ReconnectTry(void)
 
 	if (_currentReconnectAttempt >= _maxReconnectAttempt)
 	{
-		cout << "DummyClient [" << _id << "] 최대 재접속 시도 횟수 초과" << endl;
+		//cout << "DummyClient [" << _id << "] 최대 재접속 시도 횟수 초과" << endl;
 		_waitingReconnect = false;
 		return;
 	}
 
 	_currentReconnectAttempt++;
-	cout << "\n DummyClient [" << _id << "] 재접속 시도 중... (" << _currentReconnectAttempt << "/" << _maxReconnectAttempt << ")" << endl;
+	//cout << "\n DummyClient [" << _id << "] 재접속 시도 중... (" << _currentReconnectAttempt << "/" << _maxReconnectAttempt << ")" << endl;
 
 	bool reconnectResult = Connect(_serverIp.c_str(), _serverPort, _id, _hIOCP);
 	if (reconnectResult)
 	{
-		cout << "\n DummyClient [" << _id << "] 재접속 성공!" << endl;
+		//cout << "\n DummyClient [" << _id << "] 재접속 성공!" << endl;
 		_connected = true;
 		_waitingReconnect = false;
 		_currentReconnectAttempt = 0;
 	}
 	else
 	{
-		cout << "\n DummyClient [" << _id << "] 재접속 실패. 다시 시도 예정..." << endl;
+		//cout << "\n DummyClient [" << _id << "] 재접속 실패. 다시 시도 예정..." << endl;
 		_disconnectTime = GetTickCount64(); // 실패한 시간으로 갱신하여 다음 재접속 시도 시간 조정
 
 		// 재접속 실패시 간격을 점진적으로 늘릴 수도 있음 (지수 백오프)
@@ -151,7 +151,7 @@ void DummyClient::ReleaseDummyClient()
 		return;
 	}
 
-	cout << "\n DummyClient [" << _id << "] 연결 끊기 " << endl;
+	//cout << "\n DummyClient [" << _id << "] 연결 끊기 " << endl;
 
 	_connected = false;
 	_waitingReconnect = true;
