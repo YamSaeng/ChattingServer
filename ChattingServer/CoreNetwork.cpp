@@ -166,6 +166,7 @@ void CoreNetwork::Disconnect(__int64 sessionId)
 	Session* disconnectSession = FindSession(sessionId);	
 	if (disconnectSession == nullptr)
 	{		
+		ReturnSession(disconnectSession);
 		return;
 	}
 
@@ -223,9 +224,7 @@ unsigned __stdcall CoreNetwork::AcceptThreadProc(void* argument)
 				cout << "Code [" << nationCode << "] close IP: " << clientIp << endl;
 				closesocket(clientSock);
 				continue;
-			}
-
-			InterlockedIncrement(&instance->_sessionCount);
+			}			
 
 			// 세션 할당
 			Session* newSession;
@@ -233,11 +232,12 @@ unsigned __stdcall CoreNetwork::AcceptThreadProc(void* argument)
 
 			instance->_sessionIndexs.Pop(&newSessionIndex);
 			newSession = instance->_sessions[newSessionIndex];
-
+			memset(&newSession->recvOverlapped, 0, sizeof(OVERLAPPED));
+			memset(&newSession->sendOverlapped, 0, sizeof(OVERLAPPED));
 			newSession->sessionId = MAKE_SESSION_ID(instance->_sessionId, newSessionIndex);
 			newSession->clientAddr = clientAddr;
 			newSession->clientSocket = clientSock;
-			newSession->isSend = 0;
+			newSession->isSend = SENDING_DO_NOT;
 
 			// IOCP에 등록
 			CreateIoCompletionPort((HANDLE)newSession->clientSocket, instance->_HCP, (ULONG_PTR)newSession, 0);
@@ -249,6 +249,8 @@ unsigned __stdcall CoreNetwork::AcceptThreadProc(void* argument)
 
 			instance->OnClientJoin(newSession);
 			instance->RecvPost(newSession, true);			
+
+			InterlockedIncrement(&instance->_sessionCount);
 		}
 	}
 
@@ -372,7 +374,7 @@ void CoreNetwork::SendPost(Session* sendSession)
 	{
 		// Session의 isSend를 1로 바꾸면서 진입한다.
 		// 다른 워커 쓰레드가 WSASend를 하지 않도록 막는다.
-		if (InterlockedExchange(&sendSession->isSend, 1) == 0)
+		if (InterlockedExchange(&sendSession->isSend, SENDING_DO) == SENDING_DO_NOT)
 		{
 			sendUseSize = sendSession->sendQueue.Size();
 
@@ -403,7 +405,7 @@ void CoreNetwork::SendPost(Session* sendSession)
 			*/
 			if (sendUseSize == 0)
 			{
-				InterlockedExchange(&sendSession->isSend, 0);
+				InterlockedExchange(&sendSession->isSend, SENDING_DO_NOT);
 
 				if (!sendSession->sendQueue.IsEmpty())
 				{
@@ -484,12 +486,23 @@ void CoreNetwork::ReleaseSession(Session* releaseSession)
 	{
 		releaseSession->sendQueue.Clear();		
 	}
+		
+	// SendPost까지 진입해서 Alloc을 받고 session이 보낼 패킷을 저장해둔 SendPacket 배열에 기록은 해뒀으나
+	// Release로 진입해서 해제를 못하고 남아있을 경우 여기서 한번 더 확인해서 최종적으로 반납한다.
+	for (int i = 0; i < releaseSession->sendPacketCount; i++)
+	{
+		releaseSession->sendPacket[i]->Free();
+		releaseSession->sendPacket[i] = nullptr;
+	}
+
+	releaseSession->sendPacketCount = 0;
 
 	closesocket(releaseSession->clientSocket);	
-
-	InterlockedDecrement(&_sessionCount);
+	releaseSession->clientSocket = INVALID_SOCKET;	
 
 	_sessionIndexs.Push(GET_SESSION_INDEX(releaseSession->sessionId));		
+
+	InterlockedDecrement(&_sessionCount);
 }
 
 void CoreNetwork::RecvComplete(Session* recvCompleteSesion, const DWORD& transferred)
@@ -569,7 +582,7 @@ void CoreNetwork::SendComplete(Session* sendCompleteSession)
 	sendCompleteSession->sendPacketCount = 0;	
 
 	// isSend를 0 으로 바꿔서 WSASend를 걸수 있도록 해준다.
-	InterlockedExchange(&sendCompleteSession->isSend, 0);
+	InterlockedExchange(&sendCompleteSession->isSend, SENDING_DO_NOT);
 
 	// 만약 위에서 바꾸기 전에 큐잉만 하고 빠질 경우
 	// 여기서 크기를 검사해서 WSASend를 걸어준다.
@@ -605,7 +618,12 @@ Session* CoreNetwork::FindSession(__int64 sessionId)
 
 	if (sessionId != _sessions[sessionIndex]->sessionId)
 	{
-		CRASH("세션 id가 다름");
+		if (InterlockedDecrement64(&_sessions[sessionIndex]->ioBlock->ioCount) == 0)
+		{
+			ReleaseSession(_sessions[sessionIndex]);
+		}
+
+		return nullptr;
 	}
 
 	return _sessions[sessionIndex];

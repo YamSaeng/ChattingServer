@@ -13,6 +13,9 @@
 // 하위 16비트에서 SessionIndex를 가져옴
 #define GET_SESSION_INDEX(SESSION_UID)     ((uint16_t)(SESSION_UID & 0xFFFF))
 
+#define SENDING_DO_NOT 0
+#define SENDING_DO 1
+
 #define SERVER_SESSION_MAX 5000
 
 class CoreNetwork
