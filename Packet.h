@@ -77,6 +77,8 @@ public:
 	int GetData(char* dest, int size);
 	int GetData(wchar_t* dest, int size);
 
+	int InsertData(char* Src, int Size);
+
 	// 헤더 설정
 	void SetHeader(char* header, char size);
 
