@@ -5,9 +5,16 @@
 ChattingServer::ChattingServer()
 {
 	_hUpdateWakeEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
-	_hUpdateThread = (HANDLE)_beginthreadex(NULL, 0, UpdateThreadProc, this, 0, NULL);
+
+	for (int i = 0; i < 5; i++)
+	{
+		_hUpdateThreads.push_back((HANDLE)_beginthreadex(NULL, 0, UpdateThreadProc, this, 0, NULL));
+	}
 
 	packetProc[en_CHATTING_SERVER_PACKET_C2S_CHAT] = &ChattingServer::PacketProcReqChat;
+
+	_updateWakeCount = 0;
+	_updateTPS = 0;
 
 	_jobPool = new ObjectPool<Job>();
 
@@ -69,11 +76,13 @@ unsigned __stdcall ChattingServer::UpdateThreadProc(void* argument)
 	{
 		WaitForSingleObject(instance->_hUpdateWakeEvent, INFINITE);
 
+		InterlockedIncrement64(&instance->_updateWakeCount);
+
 		EnterCriticalSection(&instance->_jobQueueLock);
 		while (!instance->_jobQueue.empty())
 		{
 			Job* job = instance->_jobQueue.front();
-			instance->_jobQueue.pop();			
+			instance->_jobQueue.pop();
 
 			LeaveCriticalSection(&instance->_jobQueueLock);
 
@@ -82,10 +91,12 @@ unsigned __stdcall ChattingServer::UpdateThreadProc(void* argument)
 
 			(instance->*(instance->packetProc[protocol]))(job->sessionId, job->packet);
 
-			job->packet->Free();			
+			job->packet->Free();
 
 			EnterCriticalSection(&instance->_jobQueueLock);
 			instance->_jobPool->Free(job);
+
+			InterlockedIncrement64(&instance->_updateTPS);
 		}
 		LeaveCriticalSection(&instance->_jobQueueLock);
 	}
@@ -96,15 +107,15 @@ void ChattingServer::OnClientJoin(Session* newSession)
 }
 
 void ChattingServer::OnRecv(__int64 sessionId, Packet* packet)
-{	
-	Job* job = _jobPool->Alloc();	
-	job->sessionId = sessionId;		
+{
+	Job* job = _jobPool->Alloc();
+	job->sessionId = sessionId;
 
 	Packet* jobPacket = Packet::Alloc();
 	if (jobPacket == nullptr)
 	{
 		_jobPool->Free(job);
-		CRASH("JobPacket nullptr");		
+		CRASH("JobPacket nullptr");
 	}
 
 	jobPacket->Clear();

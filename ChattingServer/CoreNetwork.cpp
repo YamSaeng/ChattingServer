@@ -213,18 +213,17 @@ unsigned __stdcall CoreNetwork::AcceptThreadProc(void* argument)
 
 			CHAR clientIp[16] = { 0 };
 			CHAR clientInfo[50] = { 0 };
-			InetNtopA(AF_INET, &clientAddr.sin_addr, clientIp, 16);					
-					
+			InetNtopA(AF_INET, &clientAddr.sin_addr, clientIp, 16);											
+
 			string nationCode = instance->_ipCountryChecker.IPCheck(clientIp);
-
-			//cout << "NationCode : " << nationCode << " Connect Client IP : " << clientIp << " Port : " << ntohs(clientAddr.sin_port) << endl;
-
 			if (nationCode != "LOOPBACK" && nationCode != "KR")
 			{
 				cout << "Code [" << nationCode << "] close IP: " << clientIp << endl;
 				closesocket(clientSock);
 				continue;
 			}			
+
+			//cout << "NationCode : " << nationCode << " Connect Client IP : " << clientIp << " Port : " << ntohs(clientAddr.sin_port) << endl;
 
 			// 세션 할당
 			Session* newSession;
@@ -616,8 +615,10 @@ Session* CoreNetwork::FindSession(__int64 sessionId)
 		return nullptr;
 	}
 
+	// sessionId가 다르다면 
 	if (sessionId != _sessions[sessionIndex]->sessionId)
 	{
+		// 더이상 해당 session을 사용하지 않을 것이므로 ioCount를 감소시켜준다.
 		if (InterlockedDecrement64(&_sessions[sessionIndex]->ioBlock->ioCount) == 0)
 		{
 			ReleaseSession(_sessions[sessionIndex]);
