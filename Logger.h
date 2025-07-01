@@ -126,14 +126,8 @@ public:
     }
 };
 
-Logger& GetLogger()
-{
-    return Logger::GetInstance();
-}
+extern "C" LOGGER_DLL Logger& __cdecl GetLogger();
 
-void ConfigureLogger(const std::wstring& _logFile,
+extern "C" LOGGER_DLL void __cdecl ConfigureLogger(const std::wstring& logfile,
     LogLevel level = LogLevel::INFO,
-    bool _consoleOutput = true)
-{
-    Logger::GetInstance().Configure(_logFile, level, _consoleOutput);
-}
+    bool consoleOutput = true);
