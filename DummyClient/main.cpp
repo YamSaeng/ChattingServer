@@ -80,7 +80,8 @@ int main()
 	{
 		cout << "===================" << endl << endl;
 		cout << "DummyClient" << endl << endl;
-		cout << "sendTPS : [ " << dummyClientManager._sendPacketTPS << " ]" << endl;
+		cout << "DummyClientCount : [ " << dummyClientManager._dummyClientCount << " ]" << endl;
+		cout << "sendTPS : [ " << dummyClientManager._sendPacketTPS << " ]" << endl;		
 		cout << "===================";
 
 		dummyClientManager._sendPacketTPS = 0;

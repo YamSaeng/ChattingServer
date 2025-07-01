@@ -13,6 +13,12 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="헤더 파일\Security">
+      <UniqueIdentifier>{4b5ecd9d-3d20-4b8e-9ce8-f8b4ccc1d99e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\DB">
+      <UniqueIdentifier>{8dc7c647-ec53-420f-827e-119a12626a26}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -46,6 +52,12 @@
     </ClInclude>
     <ClInclude Include="IPCountryChecker.h">
       <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="SecureECDHAESCrypto.h">
+      <Filter>헤더 파일\Security</Filter>
+    </ClInclude>
+    <ClInclude Include="DBConnectionPool.h">
+      <Filter>헤더 파일\DB</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
