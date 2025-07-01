@@ -17,13 +17,10 @@ public:
 	// 패킷 헤더
 	struct EncodeHeader
 	{
-		unsigned char packetCode;
-
-		unsigned short packetLen;
-
-		unsigned char randXORCode;
-
-		unsigned char checkSum;
+		unsigned char packetCode; // packet Code 
+		unsigned short packetLen; // packet 길이
+		unsigned char randXORCode; 
+		unsigned char checkSum; 
 	};
 #pragma pack(pop)
 protected:
@@ -42,16 +39,16 @@ public:
 	Packet();
 	~Packet();
 
-	static ObjectPool<Packet> _objectPool; // ObjectPool을 사용하여 Packet을 할당
-	LONG* _retCount; // Packet이 사용되고 있는지 확인하기 위한 카운트
-	bool _isEncode;  // Packet이 한번만 인코딩되도록 하기 위한 플래그
+	static ObjectPool<Packet> _objectPool; // Packet 풀
+	LONG* _retCount; // packet 참조 횟수
+	bool _isEncode; // packet을 Encoding 했는지 여부
 
 	void Clear(void);
 
-	unsigned int GetBufferSize(void);
+	unsigned int GetBufferSize(void); // packet 기본 크기 반환
 	unsigned int GetUseBufferSize(void);
 
-	char* GetBufferPtr(void);
+	char* GetBufferPtr(void); 
 	char* GetHeaderBufferPtr(void);
 	char* GetFrontBufferPtr(void);
 	char* GetRearBufferPtr(void);
@@ -82,11 +79,9 @@ public:
 	// 헤더 설정
 	void SetHeader(char* header, char size);
 
-	// Packet을 할당
-	static Packet* Alloc(); 
-	// Packet을 반납
+	// packet 할당
+	static Packet* Alloc();
 	void Free();
-	// Packet 참조 횟수 증가
 	void AddRetCount();
 
 	// 패킷 인코딩
