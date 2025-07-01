@@ -1,16 +1,16 @@
 #pragma once
-#include"pch.h"
+
 #include<curl/curl.h>
-#include<iomanip>
+#include"../Logger.h"
 
 // IP 범위와 해당 국가 코드를 저장하는 구조체
 struct IPRange
 {
 	unsigned int start; // 범위 시작 IP 
 	unsigned int end; // 범위 끝 IP
-	string countryCode; // 국가 코드 (예: "KR", "US", "JP")
+	wstring countryCode; // 국가 코드 (예: "KR", "US", "JP")
 
-	IPRange(unsigned int s, unsigned int e, const string& c) : start(s), end(e), countryCode(c) {}
+	IPRange(unsigned int s, unsigned int e, const wstring& c) : start(s), end(e), countryCode(c) {}
 
 	// 주어진 IP가 범위에 포함되는지 확인
 	// ip : 확인할 IP 주소
@@ -44,7 +44,7 @@ static size_t WriteMemoryCallback(void* contents, size_t size, size_t nmemb, voi
 	// 기존 메모리를 확장해서 새 데이터를 추가한다.
 	char* ptr = (char*)realloc(mem->memory, mem->size + realsize + 1);
 	if (!ptr) {
-		printf("메모리 할당 실패!\n");
+		LOG_CRITICAL(L"메모리 할당 실패");		
 		return 0;
 	}
 
@@ -64,18 +64,18 @@ class IPCountryChecker
 private:
 	vector<IPRange> _ranges; // 모든 IP 범위
 	chrono::system_clock::time_point _lastUpdate; // 마지막 업데이트 시간
-	unordered_map<string, int> _countryStats; // 국가별 IP 개수 통계
+	unordered_map<wstring, int> _countryStats; // 국가별 IP 개수 통계
 
 	// 캐시 파일 관련 상수
-	const string CACHE_FILE = "ip-database.txt";	
+	const wstring CACHE_FILE = L"ip-database.txt";	
 	const int UPDATE_INTERVAL_HOURS = 24;
 
 	// RIR 정보를 저장하는 구조체
 	struct RIRInfo
 	{
-		string name; // RIR 이름 (예: "APNIC", "RIPE")
-		string url; // 데이터 다운로드 url
-		string filePrefix; // 파일 접두사
+		wstring name; // RIR 이름 (예: "APNIC", "RIPE")
+		wstring url; // 데이터 다운로드 url
+		wstring filePrefix; // 파일 접두사
 	};
 
 	/**
@@ -87,11 +87,11 @@ private:
 	 * - AFRINIC: 아프리카
 	 */
 	vector<RIRInfo> _rirList = {
-		{"APNIC", "https://ftp.apnic.net/stats/apnic/delegated-apnic-latest", "apnic"},
-		{"RIPE", "https://ftp.ripe.net/ripe/stats/delegated-ripencc-latest", "ripencc"},
-		{"ARIN", "https://ftp.arin.net/pub/stats/arin/delegated-arin-extended-latest", "arin"},
-		{"LACNIC", "https://ftp.lacnic.net/pub/stats/lacnic/delegated-lacnic-latest", "lacnic"},
-		{"AFRINIC", "https://ftp.afrinic.net/pub/stats/afrinic/delegated-afrinic-latest", "afrinic"}
+		{L"APNIC", L"https://ftp.apnic.net/stats/apnic/delegated-apnic-latest", L"apnic"},
+		{L"RIPE", L"https://ftp.ripe.net/ripe/stats/delegated-ripencc-latest", L"ripencc"},
+		{L"ARIN", L"https://ftp.arin.net/pub/stats/arin/delegated-arin-extended-latest", L"arin"},
+		{L"LACNIC", L"https://ftp.lacnic.net/pub/stats/lacnic/delegated-lacnic-latest", L"lacnic"},
+		{L"AFRINIC", L"https://ftp.afrinic.net/pub/stats/afrinic/delegated-afrinic-latest", L"afrinic"}
 	};
 
 	/**
@@ -99,40 +99,41 @@ private:
 	 * @param fileName 저장할 파일명
 	 * @return 저장 성공 여부
 	 */
-	bool SaveToFile(const string& fileName) const
+	bool SaveToFile(const wstring& fileName) const
 	{
-		ofstream file(fileName);
+		wofstream file(fileName);
 		if (!file.is_open())
 		{
-			cout << "[" << fileName << "] 파일 저장 실패" << endl;
+			LOG_ERRORF(L"[%s] 파일 저장 실패", fileName.c_str());			
 			return false;
-		}
+		}		
 
-		cout << "데이터를 파일에 저장 중: " << fileName << endl;
+		LOG_DEBUGF(L"데이터를 파일에 저장 중: %s", fileName.c_str());		
 
 		// 헤더 정보 저장 (업데이트 시간)
 		auto now = chrono::system_clock::now();
 		auto time_t_val = chrono::system_clock::to_time_t(now);
 		struct tm timeinfo;
 		localtime_s(&timeinfo, &time_t_val);
-		file << "# IP Country Database Cache File" << endl;
-		file << "# Last Updated: " << put_time(&timeinfo, "%Y-%m-%d %H:%M:%S") << endl;
-		file << "# Total Ranges: " << _ranges.size() << endl;
-		file << "#" << endl;
+
+		file << L"# IP Country Database Cache File" << endl;
+		file << L"# Last Updated: " << put_time(&timeinfo, L"%Y-%m-%d %H:%M:%S") << endl;
+		file << L"# Total Ranges: " << _ranges.size() << endl;
+		file << L"#" << endl;
 
 		// 각 IP 범위를 RIR 형식으로 저장
 		for (const auto& range : _ranges)
 		{
 			// 가상의 RIR 이름과 현재 날짜를 사용하여 표준 형식으로 저장
-			string startIP = IntToIP(range.start);
+			wstring startIP = IntToIP(range.start);
 			uint32_t count = range.end - range.start + 1;
 
-			file << "cache|" << range.countryCode << "|ipv4|"
-				<< startIP << "|" << count << "|20240101|allocated" << endl;
+			file << L"cache|" << range.countryCode << L"|ipv4|"
+				<< startIP << L"|" << count << L"|20240101|allocated" << endl;
 		}
 
 		file.close();
-		cout << fileName << "에 " << _ranges.size() << "개 범위 저장 완료" << endl;
+		LOG_DEBUGF(L"%s에 %d개 범위 저장 완료", fileName.c_str(), (int)_ranges.size());		
 		return true;
 	}
 
@@ -141,13 +142,14 @@ private:
 	 * @param fileName 확인할 파일명
 	 * @return 파일의 마지막 수정 시간
 	 */
-	chrono::system_clock::time_point GetFileModificationTime(const string& fileName) const
+	chrono::system_clock::time_point GetFileModificationTime(const wstring& fileName) const
 	{
-		struct stat fileInfo;
-		if (stat(fileName.c_str(), &fileInfo) == 0)
+		struct _stat fileInfo;
+		if (_wstat(fileName.c_str(), &fileInfo) == 0)
 		{
 			return chrono::system_clock::from_time_t(fileInfo.st_mtime);
 		}
+
 		// 파일이 없으면 epoch 시간(1970-01-01 00:00:00) 반환
 		return chrono::system_clock::from_time_t(0);
 	}
@@ -157,7 +159,7 @@ private:
 	 * @param fileName 확인할 파일명
 	 * @return 캐시가 유효하면 true
 	 */
-	bool IsCacheValid(const string& fileName) const
+	bool IsCacheValid(const wstring& fileName) const
 	{
 		auto fileTime = GetFileModificationTime(fileName);
 		// epoch 시간이면 파일이 없음
@@ -177,15 +179,15 @@ private:
 	 * @param ip IP 주소 문자열 (예: "192.168.1.1")
 	 * @return 32비트 정수로 변환된 IP 주소, 실패시 0
 	 */
-	unsigned IPToInt(const string& ip) const
+	unsigned IPToInt(const wstring& ip) const
 	{
-		istringstream iss(ip);
-		string octet;
+		wistringstream iss(ip);
+		wstring octet;
 		unsigned int result = 0;
 		int shift = 24; // 첫 번째 옥텟은 24비트 왼쪽으로 시프트
 
 		// 점(.)으로 구분된 각 옥텟을 처리
-		while (getline(iss, octet, '.') && shift >= 0)
+		while (getline(iss, octet, L'.') && shift >= 0)
 		{
 			try
 			{
@@ -208,12 +210,12 @@ private:
 	 * @param ip 32비트 정수 IP 주소
 	 * @return IP 주소 문자열
 	 */
-	string IntToIP(unsigned int ip) const
+	wstring IntToIP(unsigned int ip) const
 	{
-		return to_string((ip >> 24) & 0xFF) + "." + // 첫 번째 옥텟
-			to_string((ip >> 16) & 0xFF) + "." +	// 두 번째 옥텟
-			to_string((ip >> 8) & 0xFF) + "." +		// 세 번째 옥텟
-			to_string(ip & 0xFF);					// 네 번째 옥텟
+		return to_wstring((ip >> 24) & 0xFF) + L"." + // 첫 번째 옥텟
+			to_wstring((ip >> 16) & 0xFF) + L"." +	// 두 번째 옥텟
+			to_wstring((ip >> 8) & 0xFF) + L"." +		// 세 번째 옥텟
+			to_wstring(ip & 0xFF);					// 네 번째 옥텟
 	}
 
 	/**
@@ -224,36 +226,36 @@ private:
 	 * @param rirName RIR 이름 (로그용)
 	 * @return 파싱 성공 여부
 	 */
-	bool ParseRIRData(const string& data, const string& rirName)
+	bool ParseRIRData(const wstring& data, const wstring& rirName)
 	{
 		vector<IPRange> newRanges;
-		istringstream stream(data);
-		string line;
+		wistringstream stream(data);
+		wstring line;
 		int parsedCount = 0;
 
 		// 데이터를 한 줄씩 처리
 		while (getline(stream, line))
 		{
 			// 빈 줄이나 주석(#으로 시작) 건너뛰기
-			if (line.empty() || line[0] == '#') continue;
+			if (line.empty() || line[0] == L'#') continue;
 
 			// 파이프(|)로 구분된 필드들을 분리
-			vector<string> tokens;
-			stringstream ss(line);
-			string token;
+			vector<wstring> tokens;
+			wstringstream ss(line);
+			wstring token;
 
-			while (getline(ss, token, '|'))
+			while (getline(ss, token, L'|'))
 			{
 				tokens.push_back(token);
 			}
 
 			// 최소 5개 필드가 있고, IPv4 레코드인지 확인
-			if (tokens.size() >= 5 && tokens[2] == "ipv4")
+			if (tokens.size() >= 5 && tokens[2] == L"ipv4")
 			{
 				try
 				{
-					string countryCode = tokens[1];    // 국가 코드 (예: KR, US, JP)
-					string startIP = tokens[3];		   // 시작 IP 주소
+					wstring countryCode = tokens[1];    // 국가 코드 (예: KR, US, JP)
+					wstring startIP = tokens[3];		   // 시작 IP 주소
 					uint32_t count = stoul(tokens[4]); // IP 개수
 
 					// 유효한 국가 코드(2글자)와 IP 개수 확인
@@ -278,7 +280,7 @@ private:
 			}
 		}
 
-		cout << rirName << "에서 " << parsedCount << "개의 IP 범위 파싱 완료" << endl;
+		LOG_DEBUGF(L"%s에서 %d개의 IP 범위 파싱 완료", rirName.c_str(), parsedCount);
 
 		// 새로운 범위를 기존 범위 벡터에 추가
 		_ranges.insert(_ranges.end(), newRanges.begin(), newRanges.end());
@@ -305,15 +307,17 @@ private:
 		curl = curl_easy_init();
 		if (!curl)
 		{
-			free(chunk.memory);
-			cout << rir.name << " CURL 초기화 실패" << endl;
+			free(chunk.memory);	
+			LOG_ERRORF(L"%s CURL 초기화 실패", rir.name.c_str());			
 			return false;
 		}
 
-		cout << rir.name << "에서 데이터 다운로드 중..." << endl;
+		LOG_DEBUGF(L"%s에서 데이터 다운로드 중...", rir.name.c_str());		
+
+		string urlStr(rir.url.begin(), rir.url.end());
 
 		// CURL 옵션 설정
-		curl_easy_setopt(curl, CURLOPT_URL, rir.url.c_str());
+		curl_easy_setopt(curl, CURLOPT_URL, urlStr.c_str());
 		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
 		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&chunk);
 		curl_easy_setopt(curl, CURLOPT_USERAGENT, "IP-Country-Checker/1.0");
@@ -327,15 +331,16 @@ private:
 		// 다운로드 결과 확인
 		if (res != CURLE_OK)
 		{
-			cout << rir.name << " 다운로드 실패: " << curl_easy_strerror(res) << endl;
+			LOG_ERRORF(L"%s 다운로드 실패", rir.name.c_str());			
 			free(chunk.memory);
 			return false;
 		}
 
-		cout << rir.name << " 다운로드 완료 (" << chunk.size << " bytes)" << endl;
+		LOG_DEBUGF(L"%s 다운로드 완료 (%d bytes)", rir.name.c_str(), (int)chunk.size);		
 
 		// 다운로드된 데이터를 문자열로 변환하고 파싱
-		string data(chunk.memory);
+		string tempData(chunk.memory);
+		wstring data(tempData.begin(), tempData.end());
 		free(chunk.memory);
 
 		return ParseRIRData(data, rir.name);
@@ -345,9 +350,9 @@ private:
 	 * 한국 클라이언트 처리 로직
 	 * @param ip 클라이언트 IP 주소
 	 */
-	void ProcessKoreanClient(const string& ip)
+	void ProcessKoreanClient(const wstring& ip)
 	{
-		cout << "  -> 한국 클라이언트 서비스 제공: " << ip << endl;
+		LOG_INFO(L" -> 한국 클라이언트 서비스 제공");		
 	}
 
 	/**
@@ -355,9 +360,9 @@ private:
 	 * @param ip 클라이언트 IP 주소
 	 * @param countryCode 국가 코드
 	 */
-	void ProcessForeignClient(const string& ip, const string& countryCode)
+	void ProcessForeignClient(const wstring& ip, const wstring& countryCode)
 	{
-		cout << "  -> 외국 클라이언트 (" << countryCode << ") 접근 처리: " << ip << endl;
+		LOG_INFOF(L" -> 외국 클라이언트 (%s) 접근 처리: %s",countryCode.c_str(), ip.c_str());		
 	}
 
 public:
@@ -380,7 +385,7 @@ private:
 	 */
 	bool DownloadFromAllRIRs()
 	{
-		cout << "=== 모든 RIR에서 데이터 다운로드 시작 ===" << endl;
+		LOG_DEBUG(L"=== 모든 RIR에서 데이터 다운로드 시작 ===");
 
 		// 기존 데이터 초기화
 		_ranges.clear();
@@ -410,7 +415,7 @@ private:
 				});
 
 			_lastUpdate = chrono::system_clock::now();
-			cout << "총 " << _ranges.size() << "개의 IP 범위 로드 완료" << endl;
+			LOG_DEBUGF(L"총 %d개의 IP 범위 로드 완료", (int)_ranges.size());
 
 			// 새로 추가: 성공적으로 다운로드하면 캐시 파일에 저장
 			SaveToFile(CACHE_FILE);
@@ -425,22 +430,23 @@ private:
 	 * @param fileName 로드할 파일명
 	 * @return 로드 성공 여부
 	 */
-	bool LoadFromFile(const string& fileName)
+	bool LoadFromFile(const wstring& fileName)
 	{
-		ifstream file(fileName);
+		wifstream file(fileName);
 		if (!file.is_open())
 		{
-			cout << "[" << fileName << "] 파일을 열 수 없습니다." << endl;
+			LOG_ERRORF(L"[%s] 파일을 열 수 없습니다.", fileName.c_str());			
 			return false;
 		}
 
 		// 파일 전체 내용을 문자열로 읽기
-		string content((istreambuf_iterator<char>(file)),
-			istreambuf_iterator<char>());
+		wstring content((istreambuf_iterator<wchar_t>(file)),
+			istreambuf_iterator<wchar_t>());
 		file.close();
 
-		cout << "파일에서 데이터 로드 중: " << fileName << endl;
-		return ParseRIRData(content, "FILE");
+		LOG_DEBUGF(L"파일에서 데이터 로드 중: %s", fileName.c_str());
+		
+		return ParseRIRData(content, L"FILE");
 	}
 
 	/**
@@ -452,39 +458,41 @@ private:
 	 */
 	bool Initialize()
 	{
-		cout << "=== IP 국가 확인기 초기화 ===" << endl;
+		LOG_DEBUG(L"=== IP 국가 확인기 초기화 ===");
 
 		bool loaded = false;
 
 		// 1단계: 캐시 파일 유효성 확인
 		if (IsCacheValid(CACHE_FILE))
 		{
-			cout << "유효한 캐시 파일 발견, 캐시에서 로드 중..." << endl;
+			LOG_DEBUG(L"유효한 캐시 파일 발견, 캐시에서 로드 중...");			
+			
 			loaded = LoadFromFile(CACHE_FILE);
 			if (loaded)
 			{
 				// 캐시에서 로드 성공시 파일 수정 시간을 마지막 업데이트 시간으로 설정
 				_lastUpdate = GetFileModificationTime(CACHE_FILE);
-				cout << "캐시에서 로드 완료" << endl;
+
+				LOG_DEBUG(L"캐시에서 로드 완료");				
 			}
 		}
 
 		// 2단계: 캐시가 없거나 로드 실패시 온라인에서 다운로드
 		if (!loaded)
 		{
-			cout << "온라인에서 데이터 다운로드 시도..." << endl;
+			LOG_DEBUG(L"온라인에서 데이터 다운로드 시도...");			
 			loaded = DownloadFromAllRIRs();
 		}
 
 		// 3단계: 온라인 다운로드도 실패하면 만료된 캐시라도 사용
 		if (!loaded && GetFileModificationTime(CACHE_FILE) != chrono::system_clock::from_time_t(0))
 		{
-			cout << "온라인 다운로드 실패, 만료된 캐시 파일 사용..." << endl;
+			LOG_DEBUG(L"온라인 다운로드 실패, 만료된 캐시 파일 사용...");			
 			loaded = LoadFromFile(CACHE_FILE);
 			if (loaded)
 			{
 				_lastUpdate = GetFileModificationTime(CACHE_FILE);
-				cout << "만료된 캐시에서 로드 완료 (업데이트 권장)" << endl;
+				LOG_DEBUG(L"만료된 캐시에서 로드 완료 (업데이트 권장)");				
 			}
 		}
 
@@ -501,29 +509,29 @@ private:
 	 * 클라이언트 처리 (접속한 클라이언트의 국가에 따른 처리)
 	 * @param clientIP 클라이언트 IP 주소
 	 */
-	void HandleClient(const string& clientIP)
+	void HandleClient(const wstring& clientIP)
 	{
-		string countryCode = IPCheck(clientIP);
+		wstring countryCode = IPCheck(clientIP);
 
-		cout << "[서버] 클라이언트 " << clientIP << " -> " << countryCode;
+		LOG_DEBUGF(L"[서버] 클라이언트 %s ->", countryCode);		
 
 		// 국가 코드에 따른 처리 분기
-		if (countryCode == "KR")
+		if (countryCode == L"KR")
 		{
-			cout << " (한국 IP - 접근 허용)" << endl;
+			LOG_DEBUG(L" (한국 IP - 접근 허용)");			
 			ProcessKoreanClient(clientIP);
 		}
-		else if (countryCode == "UNKNOWN")
+		else if (countryCode == L"UNKNOWN")
 		{
-			cout << " (알 수 없는 IP)" << endl;
+			LOG_DEBUG(L" (알 수 없는 IP)");			
 		}
-		else if (countryCode == "INVALID")
+		else if (countryCode == L"INVALID")
 		{
-			cout << " (잘못된 IP 형식)" << endl;
+			LOG_DEBUG(L" (잘못된 IP 형식)");			
 		}
 		else
 		{
-			cout << " (외국 IP - 접근 제한)" << endl;
+			LOG_DEBUG(L" (외국 IP - 접근 제한)");			
 			ProcessForeignClient(clientIP, countryCode);
 		}
 	}
@@ -532,9 +540,9 @@ private:
 	 * 여러 클라이언트를 한 번에 처리
 	 * @param clientIPs 클라이언트 IP 주소 목록
 	 */
-	void HandleMultipleClients(const vector<string>& clientIPs)
+	void HandleMultipleClients(const vector<wstring>& clientIPs)
 	{
-		cout << "\n=== 배치 클라이언트 처리 ===" << endl;
+		LOG_DEBUG(L"=== 배치 클라이언트 처리 ===");
 		for (const auto& ip : clientIPs)
 		{
 			HandleClient(ip);
@@ -575,15 +583,15 @@ private:
 	 */
 	bool UpdateData()
 	{
-		cout << "수동 데이터 업데이트 시작..." << endl;
+		LOG_DEBUG(L"수동 데이터 업데이트 시작...");
 		bool success = DownloadFromAllRIRs();
 		if (success)
 		{
-			cout << "데이터 업데이트 완료" << endl;
+			LOG_DEBUG(L"데이터 업데이트 완료");
 		}
 		else
 		{
-			cout << "데이터 업데이트 실패" << endl;
+			LOG_DEBUG(L"데이터 업데이트 실패");
 		}
 		return success;
 	}
@@ -596,8 +604,8 @@ private:
 	 */
 	void PrintStatistics() const
 	{
-		cout << "\n=== IP 데이터베이스 통계 ===" << endl;
-		cout << "총 IP 범위 수: " << _ranges.size() << endl;
+		LOG_DEBUG(L"\n=== IP 데이터베이스 통계 ===");
+		LOG_DEBUGF(L"총 IP 범위 수: %d", (int)_ranges.size());		
 
 		// 전체 IP 개수 계산
 		unsigned int totalIPs = 0;
@@ -605,23 +613,32 @@ private:
 		{
 			totalIPs += (range.end - range.start + 1);
 		}
-		cout << "총 IP 개수: " << totalIPs << endl;
 
-		// 국가별 IP 개수를 내림차순으로 정렬
-		cout << "\n=== 국가별 IP 개수 (상위 10개) ===" << endl;
-		vector<pair<string, int>> sortedStats(_countryStats.begin(), _countryStats.end());
+		LOG_DEBUGF(L"총 IP 범위 수: %d", (int)_ranges.size());
+		LOG_DEBUGF(L"총 IP 개수: %d", (int)_ranges.size());		
+
+		// 국가별 IP 개수를 내림차순으로 정렬.
+		LOG_DEBUG(L"\n=== 국가별 IP 개수 (상위 10개) ===");
+		
+		vector<pair<wstring, int>> sortedStats;
+		for (const auto& stat : _countryStats)
+		{
+			sortedStats.push_back(stat);
+		}
+
 		sort(sortedStats.begin(), sortedStats.end(),
-			[](const pair<string, int>& a, const pair<string, int>& b)
+			[](const pair<wstring, int>& a, const pair<wstring, int>& b)
 			{
-				return a.second > b.second;  // IP 개수 기준 내림차순
+				return a.second > b.second;  
 			});
 
 		// 상위 10개 국가 출력
 		int count = 0;
 		for (const auto& stat : sortedStats)
 		{
-			if (count >= 10) break;
-			cout << stat.first << ": " << stat.second << " IPs" << endl;
+			if (count >= 10) break;			
+
+			LOG_DEBUGF(L"%s: %d IPs", stat.first.c_str(), stat.second);
 			count++;
 		}
 	}
@@ -636,13 +653,12 @@ private:
 		for (size_t i = 0; i < _ranges.size() && i < static_cast<size_t>(limit); ++i)
 		{
 			const auto& range = _ranges[i];
-			cout << IntToIP(range.start) << " - " << IntToIP(range.end)
-				<< " [" << range.countryCode << "] "
-				<< "(" << (range.end - range.start + 1) << " IPs)" << endl;
+			LOG_DEBUGF(L"%s - %s [%s] (%d IPs)", IntToIP(range.start), IntToIP(range.end), range.countryCode, (int)(range.end - range.start + 1));			
 		}
+
 		if (_ranges.size() > static_cast<size_t>(limit))
 		{
-			cout << "... (" << (_ranges.size() - limit) << "개 더)" << endl;
+			LOG_DEBUGF(L"... (%d개 더)", (int)(_ranges.size()) - limit);			
 		}
 	}
 
@@ -659,12 +675,12 @@ private:
 				{
 					// 지정된 시간만큼 대기
 					this_thread::sleep_for(chrono::hours(intervalHours));
-					cout << "자동 업데이트 시작..." << endl;
+					LOG_DEBUG(L"자동 업데이트 시작...");
 
 					// 모든 RIR에서 데이터 다시 다운로드
 					if (!DownloadFromAllRIRs())
 					{
-						cout << "자동 업데이트 실패" << endl;
+						LOG_DEBUG(L"자동 업데이트 실패");
 					}
 				}
 			}).detach();  // 스레드를 분리하여 백그라운드에서 실행
@@ -676,15 +692,15 @@ public:
 	 * @param ip IP 주소 문자열 (예: "8.8.8.8")
 	 * @return 국가 코드 ("KR", "US", "JP" 등) 또는 "INVALID"/"UNKNOWN"
 	 */
-	string IPCheck(const string& ip) const
+	wstring IPCheck(const wstring& ip) const
 	{
-		if (ip == "127.0.0.1")
+		if (ip == L"127.0.0.1")
 		{
-			return "LOOPBACK";
+			return L"LOOPBACK";
 		}
 
 		unsigned int ipInt = IPToInt(ip);
-		if (ipInt == 0) return "INVALID"; // 잘못된 IP 형식
+		if (ipInt == 0) return L"INVALID"; // 잘못된 IP 형식
 
 		return IPCheck(ipInt);
 	}
@@ -695,9 +711,9 @@ public:
 	 * @param ipInt IP 주소 (32비트 정수)
 	 * @return 국가 코드 ("KR", "US", "JP" 등) 또는 "INVALID"/"UNKNOWN"
 	 */
-	string IPCheck(unsigned int ipInt) const
+	wstring IPCheck(unsigned int ipInt) const
 	{
-		if (ipInt == 0) return "INVALID";
+		if (ipInt == 0) return L"INVALID";
 
 		// 이진 검색으로 해당 IP를 포함하는 범위 찾기
 		auto it = lower_bound(_ranges.begin(), _ranges.end(), ipInt,
@@ -712,7 +728,7 @@ public:
 			return it->countryCode;
 		}
 
-		return "UNKNOWN"; // 해당하는 범위를 찾지 못함
+		return L"UNKNOWN"; // 해당하는 범위를 찾지 못함
 	}
 
 	/**
@@ -720,9 +736,9 @@ public:
 	 * @param ip IP 주소 문자열
 	 * @return 한국 IP이면 true, 아니면 false
 	 */
-	bool IsKoreanIP(const string& ip) const
+	bool IsKoreanIP(const wstring& ip) const
 	{
-		return IPCheck(ip) == "KR";
+		return IPCheck(ip) == L"KR";
 	}
 
 	/**
@@ -732,7 +748,7 @@ public:
 	 */
 	bool IsKoreanIP(unsigned int ipInt) const
 	{
-		return IPCheck(ipInt) == "KR";
+		return IPCheck(ipInt) == L"KR";
 	}
 
 	/**
@@ -740,25 +756,26 @@ public:
 	 */
 	void PrintCacheStatus() const
 	{
-		cout << "\n=== 캐시 상태 정보 ===" << endl;
+		LOG_DEBUG(L"\n=== 캐시 상태 정보 ===");		
 
 		auto fileTime = GetFileModificationTime(CACHE_FILE);
 		if (fileTime == chrono::system_clock::from_time_t(0))
 		{
-			cout << "캐시 파일: 없음" << endl;
+			LOG_DEBUG(L"캐시 파일: 없음");			
 		}
 		else
 		{
 			auto time_t_val = chrono::system_clock::to_time_t(fileTime);
 			struct tm timeinfo;
-			localtime_s(&timeinfo, &time_t_val);
-			cout << "캐시 파일: " << CACHE_FILE << endl;
-			cout << "캐시 생성 시간: " << put_time(&timeinfo, "%Y-%m-%d %H:%M:%S") << endl;
-			cout << "캐시 유효성: " << (IsCacheValid(CACHE_FILE) ? "유효" : "만료") << endl;
+			localtime_s(&timeinfo, &time_t_val);			
+
+			LOG_DEBUGF(L"캐시 파일 %s", CACHE_FILE);			
+			wcout << L"캐시 생성 시간: " << put_time(&timeinfo, L"%Y-%m-%d %H:%M:%S") << endl;
+			wcout << L"캐시 유효성: " << (IsCacheValid(CACHE_FILE) ? L"유효" : L"만료") << endl;
 
 			auto now = chrono::system_clock::now();
 			auto duration = chrono::duration_cast<chrono::hours>(now - fileTime);
-			cout << "경과 시간: " << duration.count() << "시간" << endl;
+			LOG_DEBUGF(L"경과 시간: %d시간", duration.count());			
 		}
 	}
 
@@ -767,7 +784,7 @@ public:
 	{
 		if (!Initialize())
 		{
-			cout << "초기화 실패. 프로그램을 종료합니다." << endl;
+			LOG_ERROR(L"초기화 실패. 프로그램을 종료합니다.");			
 			return;
 		}		
 	}
