@@ -4,6 +4,19 @@
 
 ChattingServer::ChattingServer()
 {
+	wstring host = L"tcp://127.0.0.1:3306";
+	wstring user = L"root";
+	wstring password = L"02415325";
+	wstring dbName = L"chattingdb";
+
+	_dbPool.Initialize(
+		host,
+		user,
+		password,
+		dbName,
+		3, 10, 300
+	);
+
 	_hUpdateWakeEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 
 	for (int i = 0; i < 5; i++)

@@ -1,8 +1,8 @@
 #pragma once
 
 #include"CoreNetwork.h"
-
 #include"../ObjectPool.h"
+#include"DBConnectionPool.h"
 
 #define MAX_PROTOCOL_COUNT 50
 
@@ -18,6 +18,8 @@ public:
 	ChattingServer();
 	~ChattingServer();	
 private:
+	MySQLConnectionPool _dbPool;
+
 	vector<HANDLE> _hUpdateThreads;
 	HANDLE _hUpdateWakeEvent;
 
