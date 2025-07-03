@@ -29,16 +29,16 @@ int main()
 
 	while (true)
 	{
-		LOG_DEBUG(L"======================");
-		LOG_DEBUG(L"ChattingServer");
-		LOG_DEBUGF(L"acceptTotal : [%d]", gChattingServer._acceptTotal);
-		LOG_DEBUGF(L"acceptTPS : [%d]", gChattingServer._acceptTPS);
-		LOG_DEBUGF(L"session : [%d]", gChattingServer.SessionCount());
-		LOG_DEBUGF(L"recvTPS : [%d]", gChattingServer._recvPacketTPS);
-		LOG_DEBUGF(L"sendTPS : [%d]", gChattingServer._sendPacketTPS);
-		LOG_DEBUGF(L"updateTPS : [%d]", gChattingServer._updateTPS);
-		LOG_DEBUGF(L"updateWakeCount : [%d]", gChattingServer._updateWakeCount);
-		LOG_DEBUG(L"======================");		
+		LOG_INFO(L"======================");
+		LOG_INFO(L"ChattingServer");
+		LOG_INFOF(L"acceptTotal : [%d]", gChattingServer._acceptTotal);
+		LOG_INFOF(L"acceptTPS : [%d]", gChattingServer._acceptTPS);
+		LOG_INFOF(L"session : [%d]", gChattingServer.SessionCount());
+		LOG_INFOF(L"recvTPS : [%d]", gChattingServer._recvPacketTPS);
+		LOG_INFOF(L"sendTPS : [%d]", gChattingServer._sendPacketTPS);
+		LOG_INFOF(L"updateTPS : [%d]", gChattingServer._updateTPS);
+		LOG_INFOF(L"updateWakeCount : [%d]", gChattingServer._updateWakeCount);
+		LOG_INFO(L"======================");
 
 		gChattingServer._acceptTPS = 0;
 		gChattingServer._recvPacketTPS = 0;
